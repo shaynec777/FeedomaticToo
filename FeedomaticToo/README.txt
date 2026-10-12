@@ -1,8 +1,13 @@
-Version 2.5.0: configurable private hunger text reminders. Modes: Off, Chat, On-screen, Both. Default on-screen with repeats every 3 minutes. Set repeat minutes to 0 for once per hunger episode; 0-120 minutes accepted, including fractions. Reminders pause during combat and feeding and include a no-suitable-food explanation. Sound controls remain separate. 
+Version 2.6.0: named reminders, optional on-button food count, and low-food chat warnings (default threshold 10).
+Counts allowed, edible, unlocked food items; + indicates incomplete information. Warnings pause in combat and reset after restocking above the threshold.
+Each pet has separate allowed and blocked lists. The catalog editing button switches list type. Empty allowed lists permit all otherwise eligible foods; blocks win.
+Existing default lists initialize new pet profiles. Saved pet lists can be deleted after dismissing or switching away from the pet; deletion does not abandon a pet.
+
+Version 2.6.0: configurable private hunger text reminders. Modes: Off, Chat, On-screen, Both. Default on-screen with repeats every 3 minutes. Set repeat minutes to 0 for once per hunger episode; 0-120 minutes accepted, including fractions. Reminders pause during combat and feeding and include a no-suitable-food explanation. Sound controls remain separate. 
 
 Version 2.4.2 changes: red whole-icon warning when no suitable food is available; current-pet diet in tooltip; prominent CHECK TO BLOCK catalog instruction.
 
-FeedomaticToo 2.5.0
+FeedomaticToo 2.6.0
 Hunter pet feeding for World of Warcraft Forever beta.
 
 COMPATIBILITY

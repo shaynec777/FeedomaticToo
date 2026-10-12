@@ -1,7 +1,7 @@
 ## Interface: 16001
 ## Title: FeedomaticToo
 ## Author: Gideon (original engine); OpenAI Codex (adaptation and enhancements)
-## Version: 2.5.0
+## Version: 2.6.0
 ## Notes: Hunter pet feeding, hunger alerts, food lists and selection preferences.
 ## SavedVariablesPerCharacter: FeedomaticTooDB
 Core.lua

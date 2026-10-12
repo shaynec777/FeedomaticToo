@@ -28,6 +28,7 @@ function F.Render(mode)
         F.button.icon:SetVertexColor(1,1,1)
     end
     F.button.label:SetText(food and tostring(F.foodCount)..' food' or (mode=='hidden' and (F.reason or 'Waiting') or 'No suitable food'))
+    if F.button.supply then F.button.supply:SetText(F.SupplyCountText()) end
     F.button:Show()
 end
 
@@ -78,6 +79,8 @@ function F.BuildUI()
         end
         table.insert(b.border,edge)
     end
+    b.supply=b:CreateFontString(nil,'OVERLAY','NumberFontNormal')
+    b.supply:SetPoint('BOTTOMRIGHT',b,'BOTTOMRIGHT',-4,4)
     b.label=b:CreateFontString(nil,'OVERLAY','GameFontNormalSmall')
     b.label:SetPoint('TOP',b,'BOTTOM',0,-4)
     b:SetHighlightTexture('Interface\\Buttons\\ButtonHilight-Square','ADD')

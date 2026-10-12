@@ -1,7 +1,7 @@
 local _, F = ...
 function F.CatalogMatches(id, count, filters, cached)
     if filters.inBags and count <= 0 then return false end
-    if filters.blocked and not F.db.blacklist[id] then return false end
+    if filters.blocked and not F.FoodLists().blacklist[id] then return false end
     if filters.edible then
         if InCombatLockdown() or not UnitExists('pet') or not cached then return false end
         local edible=C_PetInfo.CanPetEatItem(id)
@@ -23,7 +23,7 @@ end
 function F.UpdateFoodCatalog()
     if InCombatLockdown() then return end
     F.bagFoodCounts = {}
-    for _,list in ipairs({F.db.blacklist,F.db.whitelist,F.db.discoveredFoods or {}}) do
+    for _,list in ipairs({F.FoodLists().blacklist,F.FoodLists().whitelist,F.db.discoveredFoods or {}}) do
         for id in pairs(list) do
             if not F.foodCatalog[id] then
                 F.foodCatalog[id]={name=C_Item.GetItemInfo(id) or ('Item '..id)}
@@ -60,6 +60,15 @@ function F.OpenFoodList()
     local title=p:CreateFontString(nil,'OVERLAY','GameFontNormalLarge')
     title:SetPoint('TOP',0,-18); title:SetText('FeedomaticToo food list')
     local close=CreateFrame('Button',nil,p,'UIPanelCloseButton'); close:SetPoint('TOPRIGHT',-4,-4)
+    p.editList='blacklist'
+    local editMode=CreateFrame('Button',nil,p,'UIPanelButtonTemplate')
+    editMode:SetSize(280,25); editMode:SetPoint('TOPLEFT',350,-110)
+    editMode:SetScript('OnClick',function()
+        p.editList=p.editList=='blacklist' and 'whitelist' or 'blacklist'; p:Refresh()
+    end)
+    local manage=CreateFrame('Button',nil,p,'UIPanelButtonTemplate')
+    manage:SetSize(130,24); manage:SetPoint('BOTTOMRIGHT',-25,16)
+    manage:SetText('Saved pet lists'); manage:SetScript('OnClick',function() F.OpenPetLists() end)
     local search=CreateFrame('EditBox',nil,p,'InputBoxTemplate'); p.search=search
     search:SetSize(610,25); search:SetPoint('TOPLEFT',30,-55); search:SetAutoFocus(false)
     search:SetScript('OnEscapePressed',function(self) self:ClearFocus() end)
@@ -135,20 +144,49 @@ function F.OpenFoodList()
     local reminderHelp=p:CreateFontString(nil,'OVERLAY','GameFontHighlightSmall')
     reminderHelp:SetPoint('TOPLEFT',25,-334)
     reminderHelp:SetText('Private reminders only. First alert when hungry; repeats pause during combat or feeding.')
+    checkbox('Food count on button',22,-353,F.db.showFoodCount,function(value)
+        F.db.showFoodCount=value; F.Refresh()
+    end)
+    checkbox('Low-food warning (chat)',250,-353,F.db.lowFoodWarning,function(value)
+        F.db.lowFoodWarning=value; F.lowFoodAlerted=nil; F.Refresh()
+    end)
+    local supplyLabel=p:CreateFontString(nil,'OVERLAY','GameFontHighlightSmall')
+    supplyLabel:SetPoint('TOPLEFT',25,-395); supplyLabel:SetText('Warn at or below:')
+    local threshold=CreateFrame('EditBox',nil,p,'InputBoxTemplate')
+    threshold:SetSize(45,25); threshold:SetPoint('TOPLEFT',135,-387)
+    threshold:SetAutoFocus(false); threshold:SetMaxLetters(3)
+    threshold:SetText(tostring(F.db.lowFoodThreshold))
+    local function saveThreshold(self)
+        local value=tonumber(self:GetText())
+        if value and value==math.floor(value) and value>=0 and value<=999 then
+            F.db.lowFoodThreshold=value; F.Refresh()
+        else F.Print('Low-food threshold must be a whole number from 0 to 999.') end
+        self:SetText(tostring(F.db.lowFoodThreshold)); self:ClearFocus()
+    end
+    threshold:SetScript('OnEnterPressed',saveThreshold)
+    threshold:SetScript('OnEditFocusLost',function(self)
+        if self:GetText()~=tostring(F.db.lowFoodThreshold) then saveThreshold(self) end
+    end)
+    threshold:SetScript('OnEscapePressed',function(self)
+        self:SetText(tostring(F.db.lowFoodThreshold)); self:ClearFocus()
+    end)
+    local supplyHelp=p:CreateFontString(nil,'OVERLAY','GameFontHighlightSmall')
+    supplyHelp:SetPoint('TOPLEFT',195,-395)
+    supplyHelp:SetText('Allowed food items. Warn once; restocking resets. + = incomplete count.')
     p.filters={}
     for _,spec in ipairs({{'In bags','inBags',22},{'Edible by current pet','edible',175},{'Blocked','blocked',415}}) do
         local key=spec[2]
-        checkbox(spec[1],spec[3],-353,false,function(value)
+        checkbox(spec[1],spec[3],-410,false,function(value)
             p.filters[key]=value; p.page=1; p:Refresh()
         end)
     end
     local blockHelp=p:CreateFontString(nil,'OVERLAY','GameFontNormal')
-    blockHelp:SetPoint('TOPLEFT',25,-390)
-    blockHelp:SetText('CHECK TO BLOCK a food. Uncheck to remove its block.')
+    blockHelp:SetPoint('TOPLEFT',25,-447)
+    p.blockHelp=blockHelp
     p.rows={}; p.page=1
-    for i=1,12 do
+    for i=1,10 do
         local row=CreateFrame('CheckButton',nil,p,'UICheckButtonTemplate')
-        row:SetPoint('TOPLEFT',22,-412-(i-1)*25)
+        row:SetPoint('TOPLEFT',22,-469-(i-1)*25)
         row.text=row:CreateFontString(nil,'OVERLAY','GameFontHighlightSmall')
         row.icon=row:CreateTexture(nil,'ARTWORK')
         row.icon:SetSize(22,22); row.icon:SetPoint('LEFT',row,'RIGHT',3,0)
@@ -164,10 +202,10 @@ function F.OpenFoodList()
         end)
         row:SetScript('OnLeave',function() GameTooltip:Hide() end)
         row.header=p:CreateFontString(nil,'OVERLAY','GameFontNormal')
-        row.header:SetPoint('TOPLEFT',25,-417-(i-1)*25)
+        row.header:SetPoint('TOPLEFT',25,-474-(i-1)*25)
         row:SetScript('OnClick',function(self)
             if not self.id then return end
-            F.db.blacklist[self.id]=self:GetChecked() and true or nil
+            F.FoodLists()[p.editList][self.id]=self:GetChecked() and true or nil
             F.bagsDirty=true; F.Refresh(true); p:Refresh()
         end)
         p.rows[i]=row
@@ -181,6 +219,10 @@ function F.OpenFoodList()
         b:SetScript('OnClick',function() p.page=p.page+step; p:Refresh() end)
     end
     function p:Refresh()
+        local lists=F.FoodLists()
+        title:SetText('Food lists: '..(lists.name or 'Default (no pet)'))
+        editMode:SetText(self.editList=='blacklist' and 'Editing: blocked foods' or 'Editing: allowed foods')
+        self.blockHelp:SetText(self.editList=='blacklist' and 'CHECK TO BLOCK a food. Uncheck to remove its block.' or 'CHECK TO ALLOW. An empty allowed list permits all foods; blocks always win.')
         order:SetText('Food item level: '..(F.db.foodOrder=='low' and 'Low to high' or 'High to low'))
         local carried,other={},{}; local query=(search:GetText() or ''):lower()
         for id,entry in pairs(F.foodCatalog) do
@@ -198,9 +240,9 @@ function F.OpenFoodList()
         for _,e in ipairs(carried) do table.insert(list,e) end
         table.insert(list,{header='Other catalog foods ('..#other..')'})
         for _,e in ipairs(other) do table.insert(list,e) end
-        local pages=math.max(1,math.ceil(#list/12)); self.page=math.max(1,math.min(pages,self.page))
+        local pages=math.max(1,math.ceil(#list/#self.rows)); self.page=math.max(1,math.min(pages,self.page))
         for i,row in ipairs(self.rows) do
-            local e=list[(self.page-1)*12+i]
+            local e=list[(self.page-1)*#self.rows+i]
             row.id=nil
             row:SetShown(e~=nil and not e.header)
             row.header:SetShown(e~=nil and e.header~=nil)
@@ -210,8 +252,8 @@ function F.OpenFoodList()
                 row.icon:SetTexture(icon or 'Interface\\Icons\\INV_Misc_QuestionMark')
                 local diet,r,g,b=F.CatalogEdibility(e.id,cached)
                 row.diet:SetText(diet); row.diet:SetTextColor(r,g,b)
-                row.id=e.id; row:SetChecked(F.db.blacklist[e.id]==true)
-                local restricted=next(F.db.whitelist) and not F.db.whitelist[e.id]
+                row.id=e.id; row:SetChecked(lists[self.editList][e.id]==true)
+                local restricted=next(F.FoodLists().whitelist) and not F.FoodLists().whitelist[e.id]
                 row.text:SetText(e.label..(e.count>0 and (' x'..e.count) or '')..(restricted and ' (outside whitelist)' or ''))
             end
         end
@@ -225,5 +267,37 @@ function F.OpenFoodList()
         if p:IsShown() and not InCombatLockdown() then F.UpdateFoodCatalog(); p:Refresh() end
     end)
     table.insert(UISpecialFrames,'GFWForeverFoodList')
+    p:Refresh()
+end
+
+function F.OpenPetLists()
+    if InCombatLockdown() then F.Print('Manage pet lists after combat.'); return end
+    F.FoodLists()
+    if F.petListPanel then F.petListPanel:Show(); F.petListPanel:Refresh(); return end
+    local p=CreateFrame('Frame',nil,UIParent,'BackdropTemplate'); F.petListPanel=p
+    p:SetSize(520,235); p:SetPoint('CENTER'); p:SetFrameStrata('FULLSCREEN_DIALOG')
+    p:SetBackdrop({bgFile='Interface\\DialogFrame\\UI-DialogBox-Background',edgeFile='Interface\\DialogFrame\\UI-DialogBox-Border',edgeSize=24})
+    local close=CreateFrame('Button',nil,p,'UIPanelCloseButton'); close:SetPoint('TOPRIGHT',-4,-4)
+    local title=p:CreateFontString(nil,'OVERLAY','GameFontNormalLarge'); title:SetPoint('TOP',0,-25); title:SetText('Saved pet food lists')
+    local info=p:CreateFontString(nil,'OVERLAY','GameFontHighlight'); info:SetPoint('TOPLEFT',25,-65); info:SetWidth(470)
+    local help=p:CreateFontString(nil,'OVERLAY','GameFontHighlightSmall'); help:SetPoint('TOPLEFT',25,-115); help:SetWidth(470)
+    help:SetText('Lists follow the summoned pet automatically. After abandoning a pet, select its saved lists here and delete them. Dismiss or switch the current pet first. Deleting lists does not delete a pet.')
+    local nextPet=CreateFrame('Button',nil,p,'UIPanelButtonTemplate'); nextPet:SetSize(160,25); nextPet:SetPoint('BOTTOMLEFT',25,25); nextPet:SetText('Next saved pet')
+    local delete=CreateFrame('Button',nil,p,'UIPanelButtonTemplate'); delete:SetSize(210,25); delete:SetPoint('BOTTOMRIGHT',-25,25)
+    function p:Refresh()
+        self.keys={}; for key in pairs(F.db.petFoodLists) do table.insert(self.keys,key) end; table.sort(self.keys)
+        self.index=math.min(self.index or 1,math.max(1,#self.keys)); self.key=self.keys[self.index]
+        local profile=self.key and F.db.petFoodLists[self.key]
+        local function count(list) local n=0; for _ in pairs(list or {}) do n=n+1 end; return n end
+        info:SetText(profile and ((profile.name or 'Unnamed pet')..'\n'..self.key..'\n'..count(profile.whitelist)..' allowed / '..count(profile.blacklist)..' blocked') or 'No saved pet lists.')
+        self.confirm=nil; delete:SetText('Delete selected lists')
+    end
+    nextPet:SetScript('OnClick',function() p.index=(p.index or 1)%math.max(1,#p.keys)+1; p:Refresh() end)
+    delete:SetScript('OnClick',function()
+        if not p.key then return end
+        if p.key==F.CurrentPetKey() then F.Print('Dismiss or switch pets before deleting its saved lists.'); return end
+        if p.confirm~=p.key then p.confirm=p.key; delete:SetText('Confirm delete lists'); return end
+        local ok,message=F.DeletePetLists(p.key); F.Print(message); p:Refresh()
+    end)
     p:Refresh()
 end

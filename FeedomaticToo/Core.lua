@@ -1,5 +1,5 @@
 local _, F = ...
-F.VERSION = "2.5.0"
+F.VERSION = "2.6.0"
 F.FEED_SPELL = 6991
 F.FEED_EFFECT = 1539
 
@@ -34,6 +34,12 @@ function F.LoadSettings()
     local minutes = tonumber(F.db.reminderMinutes)
     if not minutes or minutes ~= minutes or minutes < 0 or minutes > 120 then minutes = 3 end
     F.db.reminderMinutes = minutes
+    if type(F.db.showFoodCount) ~= "boolean" then F.db.showFoodCount = true end
+    if type(F.db.lowFoodWarning) ~= "boolean" then F.db.lowFoodWarning = true end
+    local threshold = tonumber(F.db.lowFoodThreshold)
+    if not threshold or threshold ~= threshold or threshold < 0 or threshold > 999 then threshold = 10 end
+    F.db.lowFoodThreshold = math.floor(threshold)
+    if type(F.db.petFoodLists) ~= "table" then F.db.petFoodLists = {} end
     F.bagsDirty = true
 end
 
@@ -97,16 +103,53 @@ end
 
 -- Use the client's native diet/eligibility check; no English tooltip parsing
 -- or incomplete item-ID whitelist. Only carried bags are scanned, never banks.
+function F.CurrentPetKey()
+    if InCombatLockdown and InCombatLockdown() then return nil end
+    local guid=UnitGUID and UnitGUID("pet")
+    if public(guid) and type(guid)=="string" and guid~="" then return guid end
+end
+
+function F.FoodLists()
+    local key=F.CurrentPetKey()
+    if not key then return F.db end
+    F.db.petFoodLists=F.db.petFoodLists or {}
+    local profile=F.db.petFoodLists[key]
+    if type(profile)~="table" then
+        profile={whitelist={},blacklist={}}
+        -- Preserve existing food protection as the starting point for each pet.
+        for _,kind in ipairs({"whitelist","blacklist"}) do
+            for id,value in pairs(F.db[kind]) do profile[kind][id]=value end
+        end
+        F.db.petFoodLists[key]=profile
+    end
+    for _,kind in ipairs({"whitelist","blacklist"}) do
+        if type(profile[kind])~="table" then profile[kind]={} end
+    end
+    local name=UnitName and UnitName("pet")
+    if public(name) and type(name)=="string" and name:find("%S") then profile.name=name end
+    return profile
+end
+
+function F.DeletePetLists(key)
+    if InCombatLockdown() then return false,"Delete lists after combat." end
+    if key==F.CurrentPetKey() then return false,"Dismiss or switch pets before deleting its saved lists." end
+    if not key or not F.db.petFoodLists[key] then return false,"No saved lists selected." end
+    F.db.petFoodLists[key]=nil
+    return true,"Saved pet food lists deleted."
+end
+
 function F.FoodAllowed(id)
-    if F.db.blacklist[id] then return false end
-    return next(F.db.whitelist) == nil or F.db.whitelist[id] == true
+    local lists=F.FoodLists()
+    if lists.blacklist[id] then return false end
+    return next(lists.whitelist) == nil or lists.whitelist[id] == true
 end
 
 function F.ListCommand(text)
     local list, action, item = text:match('^%s*(%S+)%s+(%S+)%s*(.-)%s*$')
     list, action = list and list:lower(), action and action:lower()
     if list ~= 'whitelist' and list ~= 'blacklist' then return false end
-    local entries = F.db[list]
+    local lists=F.FoodLists()
+    local entries = lists[list]
     if action == 'list' then
         local ids = {}
         for id in pairs(entries) do table.insert(ids, id) end
@@ -118,7 +161,7 @@ function F.ListCommand(text)
         end
         return true
     elseif action == 'clear' then
-        F.db[list] = {}
+        lists[list] = {}
     elseif action == 'add' or action == 'remove' then
         local id = tonumber(item:match('item:(%d+)') or item:match('^(%d+)$'))
         if not id or id < 1 or id ~= math.floor(id) then
@@ -130,7 +173,7 @@ function F.ListCommand(text)
         return true
     end
     F.bagsDirty = true
-    F.Print(list .. ' updated.' .. (next(F.db.whitelist) and ' Whitelist restriction is active.' or ' Whitelist restriction is off.'))
+    F.Print(list .. ' updated.' .. (next(lists.whitelist) and ' Whitelist restriction is active.' or ' Whitelist restriction is off.'))
     F.Refresh(true)
     return true
 end
@@ -240,11 +283,19 @@ function F.CheckHungerSound(state, reason)
 end
 
 -- Local notifications only; never sends to any player or channel.
+function F.ReminderPetName()
+    if InCombatLockdown() then return "Your pet" end
+    local name = UnitName and UnitName("pet")
+    if public(name) and type(name) == "string" and name:find("%S") then return name end
+    return "Your pet"
+end
+
 function F.HungerMessage()
+    local name = F.ReminderPetName()
     if not F.food and not F.pendingItems and not F.lockedFood then
-        return "Your pet is hungry - no suitable, allowed food in your bags."
+        return name .. " is hungry - no suitable, allowed food in your bags."
     end
-    return "Your pet is hungry."
+    return name .. " is hungry."
 end
 
 function F.ShowTextReminder(test)
@@ -253,7 +304,7 @@ function F.ShowTextReminder(test)
         if test then F.Print("Text reminders are off.") end
         return
     end
-    local message = test and "Your pet is hungry. (Test reminder)" or F.HungerMessage()
+    local message = test and (F.ReminderPetName() .. " is hungry. (Test reminder)") or F.HungerMessage()
     local screen = mode == "screen" or mode == "both"
     local chat = mode == "chat" or mode == "both"
     if screen and RaidNotice_AddMessage and RaidWarningFrame then
@@ -285,7 +336,7 @@ function F.CheckTextReminder(state, reason)
 end
 
 function F.WhyThisFood()
-    if InCombatLockdown() then return nil end
+    if InCombatLockdown and InCombatLockdown() then return nil end
     if not F.food or (F.mode ~= "food" and F.reason ~= "Pet is happy") then return nil end
     return ("Why this food? %s is allowed by your lists, unlocked, and edible by your pet. " ..
         "Its item level (%d) ranks %s among available choices. Equal levels use the smaller stack (%d here); " ..
@@ -294,18 +345,51 @@ function F.WhyThisFood()
         F.pendingItems and " Some item information is still loading." or "")
 end
 
+-- Count only allowed, edible, unlocked items from the current bag scan.
+function F.SupplyCountText()
+    if not F.db.showFoodCount then return "" end
+    if F.reason ~= "Pet is happy" and F.mode ~= "food" and F.mode ~= "nofood" then return "" end
+    if F.foodCount == nil then return "" end
+    return tostring(F.foodCount) .. ((F.pendingItems or F.lockedFood) and "+" or "")
+end
+
+function F.CheckLowFood(state, reason)
+    if InCombatLockdown() or not F.db.enabled then return end
+    if reason == "No pet" or reason == "Pet is dead" or reason == "Hunter only" then
+        F.lowFoodPet=nil; F.lowFoodAlerted=nil; return
+    end
+    if state ~= "hungry" and reason ~= "Pet is happy" then return end
+    local pet = UnitGUID and UnitGUID("pet")
+    if not public(pet) or not pet then return end
+    if pet ~= F.lowFoodPet then F.lowFoodPet=pet; F.lowFoodAlerted=nil end
+    if not F.db.lowFoodWarning then F.lowFoodAlerted=nil; return end
+    if F.pendingItems or F.lockedFood or F.foodCount == nil then return end
+    if F.foodCount > F.db.lowFoodThreshold then F.lowFoodAlerted=nil; return end
+    if F.lowFoodAlerted then return end
+    F.lowFoodAlerted=true
+    local name=F.ReminderPetName()
+    if F.foodCount == 0 then
+        F.Print(name .. " has no suitable, allowed food left. Stock up before heading out.")
+    else
+        F.Print(("%s has %d food item%s left. Stock up before heading out."):format(
+            name, F.foodCount, F.foodCount == 1 and "" or "s"))
+    end
+end
+
 function F.Refresh(forceScan)
     if not F.button or InCombatLockdown() or F.clickInProgress then return end
     if F.dragging then F.Disarm(); return end
     if not F.db.enabled then F.Disarm(); F.button:Hide(); return end
+    F.FoodLists()
     local state, reason = F.GetState()
     F.reason = reason
     F.CheckHungerSound(state, reason)
     F.Disarm()
     if reason == "Hunter only" then F.button:Hide(); return end
     if reason == "Pet is happy" and (forceScan or F.bagsDirty) then F.FindFood() end
-    if state ~= "hungry" then F.CheckTextReminder(state, reason); F.Render("hidden"); return end
+    if state ~= "hungry" then F.CheckLowFood(state, reason); F.CheckTextReminder(state, reason); F.Render("hidden"); return end
     if forceScan or F.bagsDirty then F.FindFood() end
+    F.CheckLowFood(state, reason)
     F.CheckTextReminder(state, reason)
     if F.food then
         local b = F.button
