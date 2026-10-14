@@ -1,3 +1,12 @@
+# HunterTools 3.0.1
+
+- Fix duplicate Feed Pet keybinding warnings when the legacy FeedomaticToo settings loader and HunterTools are both enabled.
+- The compatibility folder now includes an empty Bindings.xml, replacing the old binding declaration. Existing Feed Pet key assignments and automatic settings migration are preserved.
+
+Install both folders from the ZIP, overwriting existing files. Enable HunterTools and the FeedomaticToo settings migration loader for the first import; restart the client.
+
+Original engine: Gideon (MIT). Adaptation and enhancements: OpenAI Codex.
+
 # HunterTools 3.0.0
 
 - Rename FeedomaticToo to HunterTools, with a settings-only legacy loader and one-time per-character migration.
