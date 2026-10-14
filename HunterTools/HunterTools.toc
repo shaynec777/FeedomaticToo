@@ -1,7 +1,7 @@
 ## Interface: 16001
 ## Title: HunterTools
 ## Author: Gideon (original engine); OpenAI Codex (adaptation and enhancements)
-## Version: 3.0.0
+## Version: 3.0.1
 ## Notes: Hunter pet feeding, hunger alerts, food lists and selection preferences.
 ## SavedVariablesPerCharacter: HunterToolsDB
 ## OptionalDeps: FeedomaticToo
