@@ -1,0 +1,1 @@
+-- Compatibility loader only. HunterTools imports the saved settings.
