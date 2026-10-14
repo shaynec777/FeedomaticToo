@@ -1,5 +1,3 @@
 <Bindings>
-    <Binding name="CLICK GFWForeverFeedButton:LeftButton" header="GFWFOREVER" category="ADDONS">
-        <!-- The client dispatches this binding directly to the secure feed button. -->
-    </Binding>
+    <!-- Settings-only migration addon: HunterTools owns the Feed Pet binding. -->
 </Bindings>
