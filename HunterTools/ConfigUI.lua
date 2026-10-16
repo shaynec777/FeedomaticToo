@@ -16,7 +16,7 @@ local function panel(name,title,w,h)
     return p
 end
 function F.HideConfigPages()
-    for _,key in ipairs({'configPanel','foodPanel','ammoPanel','instanceSettingsPanel','rangeSettingsPanel','petListPanel'}) do
+    for _,key in ipairs({'configPanel','foodPanel','ammoPanel','instanceSettingsPanel','rangeSettingsPanel','petStatusSettingsPanel','petListPanel'}) do
         if F[key] then F[key]:Hide() end
     end
 end
@@ -24,6 +24,7 @@ function F.ToolEnabled(key)
     if key=='food' then return F.db.enabled end
     if key=='instance' then return F.InstanceSettings().enabled~=false end
     if key=='ammo' then return F.db.ammo.enabled end
+    if key=='pet' then return F.PetStatusSettings().enabled end
     return F.RangeSettings().enabled
 end
 function F.SetToolEnabled(key,value)
@@ -33,18 +34,19 @@ function F.SetToolEnabled(key,value)
         F.InstanceSettings().enabled=value
         if not value then F.instanceCheckPending=false; if F.instancePrompt then F.instancePrompt:Hide() end end
     elseif key=='ammo' then F.db.ammo.enabled=value; F.ResetAmmoReminder()
+    elseif key=='pet' then F.PetStatusSettings().enabled=value; F.UpdatePetStatusWindow()
     else F.RangeSettings().enabled=value; F.UpdateRangeWindow() end
 end
 function F.OpenConfig()
     if InCombatLockdown() then F.Print('Open settings after combat.'); return end
     F.HideConfigPages()
     if not F.configPanel then
-        local p=panel('HunterToolsConfig','HunterTools tools',440,310); F.configPanel=p
+        local p=panel('HunterToolsConfig','HunterTools tools',440,360); F.configPanel=p
         p.checks={}
         local help=p:CreateFontString(nil,'OVERLAY','GameFontHighlightSmall')
         help:SetPoint('TOPLEFT',28,-53); help:SetText('Check to enable a tool. Settings opens its controls.')
         for i,spec in ipairs({{'food','Food','OpenFoodList'},{'instance','Instance','OpenInstanceSettings'},
-            {'ammo','Ammo','OpenAmmoSettings'},{'range','Range','OpenRangeSettings'}}) do
+            {'ammo','Ammo','OpenAmmoSettings'},{'range','Range','OpenRangeSettings'},{'pet','Pet status','OpenPetStatusSettings'}}) do
             local key,method=spec[1],spec[3]
             local c=CreateFrame('CheckButton',nil,p,'UICheckButtonTemplate')
             c:SetPoint('TOPLEFT',25,-80-(i-1)*50); p.checks[key]=c
@@ -58,6 +60,38 @@ function F.OpenConfig()
     end
     for key,c in pairs(F.configPanel.checks) do c:SetChecked(F.ToolEnabled(key)) end
     F.configPanel:Show()
+end
+function F.OpenPetStatusSettings()
+    if InCombatLockdown() then F.Print('Open settings after combat.');return end
+    F.HideConfigPages()
+    if not F.petStatusSettingsPanel then
+        local p=panel('HunterToolsPetStatusSettings','Pet status and mouseover tips',590,590);F.petStatusSettingsPanel=p
+        local help=p:CreateFontString(nil,'OVERLAY','GameFontHighlightSmall');help:SetPoint('TOPLEFT',28,-54);help:SetWidth(530)
+        help:SetText('Window and tips have independent fields. Tips show your own pet. Drag the window outside combat; right-click it for the tool menu. Unit details pause during combat.')
+        p.tips=CreateFrame('CheckButton',nil,p,'UICheckButtonTemplate');p.tips:SetPoint('TOPLEFT',25,-98)
+        local tipLabel=p.tips:CreateFontString(nil,'OVERLAY','GameFontHighlight');tipLabel:SetPoint('LEFT',p.tips,'RIGHT',2,0);tipLabel:SetText('Enable mouseover pet tips')
+        p.tips:SetScript('OnClick',function() F.PetStatusSettings().tooltipEnabled=p.tips:GetChecked() and true or false end)
+        p.lock=CreateFrame('CheckButton',nil,p,'UICheckButtonTemplate');p.lock:SetPoint('TOPLEFT',335,-98)
+        local lockLabel=p.lock:CreateFontString(nil,'OVERLAY','GameFontHighlight');lockLabel:SetPoint('LEFT',p.lock,'RIGHT',2,0);lockLabel:SetText('Lock window position')
+        p.lock:SetScript('OnClick',function() F.PetStatusSettings().locked=p.lock:GetChecked() and true or false end)
+        for _,spec in ipairs({{365,'Window'},{465,'Mouseover'}}) do
+            local h=p:CreateFontString(nil,'OVERLAY','GameFontNormal');h:SetPoint('TOPLEFT',spec[1],-140);h:SetText(spec[2])
+        end
+        p.fields={windowFields={},tooltipFields={}}
+        for i,field in ipairs(F.petStatusFields) do
+            local key=field[1];local y=-166-(i-1)*29
+            local label=p:CreateFontString(nil,'OVERLAY','GameFontHighlight');label:SetPoint('TOPLEFT',30,y-6);label:SetText(field[2])
+            for _,spec in ipairs({{'windowFields',365},{'tooltipFields',465}}) do
+                local surface=spec[1];local c=CreateFrame('CheckButton',nil,p,'UICheckButtonTemplate');c:SetPoint('TOPLEFT',spec[2],y);p.fields[surface][key]=c
+                c:SetScript('OnClick',function() F.PetStatusSettings()[surface][key]=c:GetChecked() and true or false;F.UpdatePetStatusWindow() end)
+            end
+        end
+        local reset=CreateFrame('Button',nil,p,'UIPanelButtonTemplate');reset:SetSize(180,26);reset:SetPoint('BOTTOM',0,73);reset:SetText('Reset window position');reset:SetScript('OnClick',F.ResetPetStatusPosition)
+        local back=CreateFrame('Button',nil,p,'UIPanelButtonTemplate');back:SetSize(160,26);back:SetPoint('BOTTOM',0,30);back:SetText('Back to settings');back:SetScript('OnClick',F.OpenConfig)
+    end
+    local p=F.petStatusSettingsPanel;local s=F.PetStatusSettings();p.tips:SetChecked(s.tooltipEnabled);p.lock:SetChecked(s.locked)
+    for surface,fields in pairs(p.fields) do for key,c in pairs(fields) do c:SetChecked(s[surface][key]) end end
+    p:Show()
 end
 function F.OpenRangeSettings()
     if InCombatLockdown() then F.Print('Open settings after combat.'); return end

@@ -113,12 +113,15 @@ loader:SetScript('OnEvent',function(_,event,a,b,c)
         if a~=addonName then return end
         loader:UnregisterEvent('ADDON_LOADED')
         F.LoadSettings()
+        F.ReplayPetAbilityLearning()
         SLASH_FEEDOMATICTOO1='/ht'
         SLASH_FEEDOMATICTOO3='/fom'
         SLASH_FEEDOMATICTOO4='/huntertools'
         SLASH_FEEDOMATICTOO2='/feedomatictoo'
         SlashCmdList.FEEDOMATICTOO=function(text)
             if (text or ''):lower():match('^%s*trainingdebug%s*$') then F.DebugPetTraining(); return end
+            if (text or ''):lower():match('^%s*pet%s*$') then local s=F.PetStatusSettings();F.SetToolEnabled('pet',not s.enabled);return end
+            if (text or ''):lower():match('^%s*petsettings%s*$') then F.OpenPetStatusSettings();return end
             if (text or ''):lower():match('^%s*range%s*$') then local s=F.RangeSettings(); s.enabled=not s.enabled; F.UpdateRangeWindow(); return end
             if (text or ''):lower():match('^%s*ammodebug%s*$') then F.DebugAmmo(); return end
             if (text or ''):lower():match('^%s*$') or (text or ''):lower():match('^%s*config%s*$') then F.OpenConfig(); return end
@@ -137,24 +140,29 @@ loader:SetScript('OnEvent',function(_,event,a,b,c)
         if not F.supported then F.Print('Required Forever APIs are unavailable.'); return end
         for _,e in ipairs({'PLAYER_ENTERING_WORLD','PLAYER_REGEN_ENABLED','BAG_UPDATE_DELAYED','PLAYER_EQUIPMENT_CHANGED',
             'ITEM_LOCK_CHANGED','GET_ITEM_INFO_RECEIVED','UNIT_PET','UNIT_HAPPINESS',
-            'UNIT_AURA','SPELLS_CHANGED','UNIT_SPELLCAST_SUCCEEDED',
+            'UNIT_AURA','SPELLS_CHANGED','UNIT_SPELLCAST_SUCCEEDED','UNIT_SPELLCAST_FAILED','UNIT_SPELLCAST_INTERRUPTED',
             'QUEST_LOG_UPDATE','QUEST_ACCEPTED','QUEST_REMOVED','QUEST_TURNED_IN'}) do loader:RegisterEvent(e) end
     end
     if not F.supported then return end
+    if event=='ADDON_LOADED' or event=='PLAYER_ENTERING_WORLD' then F.QueueFoodEntryScan() end
+    if event=='BAG_UPDATE_DELAYED' or event=='GET_ITEM_INFO_RECEIVED' or event=='ITEM_LOCK_CHANGED' or event=='UNIT_PET' then
+        F.foodEntrySnapshot=nil
+    end
     if event=='PLAYER_ENTERING_WORLD' then F.QueueInstanceCheck(); F.QueueAmmoEntryScan() end
     F.bagsDirty=true
     if event=='ADDON_LOADED' or event=='PLAYER_ENTERING_WORLD' or event=='PLAYER_REGEN_ENABLED'
         or event=='BAG_UPDATE_DELAYED' or event=='PLAYER_EQUIPMENT_CHANGED' or event=='GET_ITEM_INFO_RECEIVED' then F.ammoDirty=true end
-    if event=='UNIT_SPELLCAST_SUCCEEDED' and a=='player' and c==F.FEED_SPELL then
-        F.waitUntil=GetTime()+1
+    if event=='UNIT_SPELLCAST_SUCCEEDED' or event=='UNIT_SPELLCAST_FAILED' or event=='UNIT_SPELLCAST_INTERRUPTED' then
+        F.HandleFeedCastEvent(event,a,c)
     end
     if InCombatLockdown() or F.clickInProgress then return end
     if not F.button then
         F.BuildUI()
-        F.ticker=C_Timer.NewTicker(0.5,function() F.UpdateHappinessBorder(); F.Refresh(); F.CheckAmmoReminder(); F.CheckInstancePrompt(); F.UpdateRangeWindow() end)
+        F.ticker=C_Timer.NewTicker(0.5,function() F.UpdateHappinessBorder(); F.Refresh(); F.CheckAmmoReminder(); F.CheckInstancePrompt(); F.UpdateRangeWindow(); F.UpdatePetStatusWindow() end)
     end
     if F.dragging then
         F.button:StopMovingOrSizing(); F.dragging=false
     end
     F.Refresh()
+    F.UpdatePetStatusWindow()
 end)

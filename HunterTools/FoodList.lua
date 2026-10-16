@@ -224,7 +224,7 @@ function F.OpenFoodList()
         row.header:SetPoint('TOPLEFT',25,-506-(i-1)*25)
         row:SetScript('OnClick',function(self)
             if not self.id then return end
-            F.FoodLists()[p.editList][self.id]=self:GetChecked() and true or nil
+            F.FoodLists(true)[p.editList][self.id]=self:GetChecked() and true or nil
             F.bagsDirty=true; F.Refresh(true); p:Refresh()
         end)
         p.rows[i]=row
@@ -295,29 +295,46 @@ function F.OpenPetLists()
     F.FoodLists()
     if F.petListPanel then F.petListPanel:Show(); F.petListPanel:Refresh(); return end
     local p=CreateFrame('Frame',nil,UIParent,'BackdropTemplate'); F.petListPanel=p
-    p:SetSize(520,235); p:SetPoint('CENTER'); p:SetFrameStrata('FULLSCREEN_DIALOG')
-    p:SetBackdrop({bgFile='Interface\\DialogFrame\\UI-DialogBox-Background',edgeFile='Interface\\DialogFrame\\UI-DialogBox-Border',edgeSize=24})
+    p:SetSize(600,350); p:SetPoint('CENTER'); p:SetFrameStrata('FULLSCREEN_DIALOG');p:SetClampedToScreen(true)
+    p:SetBackdrop({bgFile='Interface\\Buttons\\WHITE8X8',edgeFile='Interface\\DialogFrame\\UI-DialogBox-Border',edgeSize=24})
+    p:SetBackdropColor(0.055,0.055,0.055,1)
     local close=CreateFrame('Button',nil,p,'UIPanelCloseButton'); close:SetPoint('TOPRIGHT',-4,-4)
     local title=p:CreateFontString(nil,'OVERLAY','GameFontNormalLarge'); title:SetPoint('TOP',0,-25); title:SetText('Saved pet food lists')
-    local info=p:CreateFontString(nil,'OVERLAY','GameFontHighlight'); info:SetPoint('TOPLEFT',25,-65); info:SetWidth(470)
-    local help=p:CreateFontString(nil,'OVERLAY','GameFontHighlightSmall'); help:SetPoint('TOPLEFT',25,-115); help:SetWidth(470)
-    help:SetText('Lists follow the summoned pet automatically. After abandoning a pet, select its saved lists here and delete them. Dismiss or switch the current pet first. Deleting lists does not delete a pet.')
-    local nextPet=CreateFrame('Button',nil,p,'UIPanelButtonTemplate'); nextPet:SetSize(160,25); nextPet:SetPoint('BOTTOMLEFT',25,25); nextPet:SetText('Next saved pet')
-    local delete=CreateFrame('Button',nil,p,'UIPanelButtonTemplate'); delete:SetSize(210,25); delete:SetPoint('BOTTOMRIGHT',-25,25)
+    local info=p:CreateFontString(nil,'OVERLAY','GameFontHighlight'); info:SetPoint('TOPLEFT',25,-65); info:SetWidth(550)
+    local help=p:CreateFontString(nil,'OVERLAY','GameFontHighlightSmall'); help:SetPoint('TOPLEFT',25,-155); help:SetWidth(550)
+    help:SetText('Lists follow pet name + family. Matching names in different families stay separate. Legacy records without a family are grouped for cleanup, not mixed into another pet\'s rules. Summoning creates a default list: all edible foods are allowed unless restricted by your rules or food protections. Deleting lists does not delete pets.')
+    local result=p:CreateFontString(nil,'OVERLAY','GameFontHighlightSmall');result:SetPoint('TOPLEFT',25,-220);result:SetWidth(550);p.result=result
+    local prev=CreateFrame('Button',nil,p,'UIPanelButtonTemplate');prev:SetSize(140,25);prev:SetPoint('BOTTOMLEFT',25,65);prev:SetText('Previous saved pet')
+    local nextPet=CreateFrame('Button',nil,p,'UIPanelButtonTemplate'); nextPet:SetSize(140,25); nextPet:SetPoint('BOTTOMLEFT',175,65); nextPet:SetText('Next saved pet')
+    local delete=CreateFrame('Button',nil,p,'UIPanelButtonTemplate'); delete:SetSize(230,25); delete:SetPoint('BOTTOMRIGHT',-25,65)
+    local deleteAll=CreateFrame('Button',nil,p,'UIPanelButtonTemplate');deleteAll:SetSize(280,25);deleteAll:SetPoint('BOTTOMRIGHT',-25,25)
     function p:Refresh()
-        self.keys={}; for key in pairs(F.db.petFoodLists) do table.insert(self.keys,key) end; table.sort(self.keys)
-        self.index=math.min(self.index or 1,math.max(1,#self.keys)); self.key=self.keys[self.index]
-        local profile=self.key and F.db.petFoodLists[self.key]
-        local function count(list) local n=0; for _ in pairs(list or {}) do n=n+1 end; return n end
-        info:SetText(profile and ((profile.name or 'Unnamed pet')..'\n'..self.key..'\n'..count(profile.whitelist)..' allowed / '..count(profile.blacklist)..' blocked') or 'No saved pet lists.')
-        self.confirm=nil; delete:SetText('Delete selected lists')
+        self.groups=F.SavedPetListGroups();self.index=math.min(self.index or 1,math.max(1,#self.groups));self.group=self.groups[self.index];self.key=self.group and self.group.id
+        local g=self.group
+        info:SetText(g and (('Saved group %d of %d%s\n%s — %s\n%d saved record(s); %d whitelist / %d blocked entries'):format(self.index,#self.groups,g.active and ' • Current pet / protected' or '',g.name,g.family,#g.keys,g.allowed,g.blocked)) or 'No saved pet lists.')
+        self.confirm=nil;self.confirmAll=nil; delete:SetText('Delete selected lists');deleteAll:SetText('Delete all inactive lists');result:SetText('')
     end
-    nextPet:SetScript('OnClick',function() p.index=(p.index or 1)%math.max(1,#p.keys)+1; p:Refresh() end)
+    nextPet:SetScript('OnClick',function() p.index=(p.index or 1)%math.max(1,#p.groups)+1; p:Refresh() end)
+    prev:SetScript('OnClick',function() p.index=((p.index or 1)-2)%math.max(1,#p.groups)+1;p:Refresh() end)
     delete:SetScript('OnClick',function()
-        if not p.key then return end
-        if p.key==F.CurrentPetKey() then F.Print('Dismiss or switch pets before deleting its saved lists.'); return end
-        if p.confirm~=p.key then p.confirm=p.key; delete:SetText('Confirm delete lists'); return end
-        local ok,message=F.DeletePetLists(p.key); F.Print(message); p:Refresh()
+        if InCombatLockdown() then F.Print('Delete lists after combat.');return end
+        if not p.group then return end
+        local group
+        for _,candidate in ipairs(F.SavedPetListGroups()) do if candidate.id==p.key then group=candidate end end
+        if not group then p:Refresh();return end
+        if group.active then result:SetText('Dismiss or switch pets first. Unknown-family legacy lists sharing your pet\'s name are protected too.');return end
+        p.confirmAll=nil;deleteAll:SetText('Delete all inactive lists')
+        local signature=table.concat(group.keys,'\n')
+        if p.confirm~=signature then p.confirm=signature;delete:SetText(('Confirm delete %d record(s)'):format(#group.keys));return end
+        local ok,message=F.DeleteSavedPetLists(group.keys);F.Print(message);p:Refresh()
+        result:SetText(ok and (group.name..' — '..group.family..' deleted. '..#p.groups..' group(s) remain.') or message)
+    end)
+    deleteAll:SetScript('OnClick',function()
+        if InCombatLockdown() then F.Print('Delete lists after combat.');return end
+        local keys=F.InactivePetListKeys();if #keys==0 then result:SetText('No inactive saved lists to delete.');return end
+        local signature=table.concat(keys,'\n');p.confirm=nil;delete:SetText('Delete selected lists')
+        if p.confirmAll~=signature then p.confirmAll=signature;deleteAll:SetText(('Confirm delete %d inactive records'):format(#keys));return end
+        local ok,message=F.DeleteSavedPetLists(keys);F.Print(message);p:Refresh();result:SetText(message)
     end)
     p:Refresh()
 end

@@ -1,5 +1,5 @@
 local _, F = ...
-F.VERSION = "3.0.1"
+F.VERSION = "3.0.2"
 F.FEED_SPELL = 6991
 F.FEED_EFFECT = 1539
 
@@ -50,8 +50,10 @@ function F.LoadSettings()
     if not threshold or threshold ~= threshold or threshold < 0 or threshold > 999 then threshold = 10 end
     F.db.lowFoodThreshold = math.floor(threshold)
     if type(F.db.petFoodLists) ~= "table" then F.db.petFoodLists = {} end
+    F.NormalizePetFoodProfiles()
     F.bagsDirty = true
     if F.LoadAmmoSettings then F.LoadAmmoSettings() end
+    if F.PetStatusSettings then F.PetStatusSettings() end
 end
 
 function F.CheckAPIs()
@@ -117,36 +119,147 @@ end
 function F.CurrentPetKey()
     if InCombatLockdown and InCombatLockdown() then return nil end
     local guid=UnitGUID and UnitGUID("pet")
-    if public(guid) and type(guid)=="string" and guid~="" then return guid end
+    if not public(guid) or type(guid)~='string' or guid=='' then return end
+    local name=UnitName and UnitName('pet')
+    local family=UnitCreatureFamily and UnitCreatureFamily('pet')
+    if public(name) and public(family) and type(name)=='string' and name:find('%S') and type(family)=='string' and family:find('%S') then
+        return F.PetFoodProfileKey(name,family)
+    end
+    return guid
 end
 
-function F.FoodLists()
+function F.PetFoodProfileKey(name,family)
+    return 'pet:'..name:match('^%s*(.-)%s*$'):lower()..':'..family:match('^%s*(.-)%s*$'):lower()
+end
+
+local function mergeFoodRules(target,source)
+    for _,kind in ipairs({'whitelist','blacklist'}) do
+        if type(target[kind])~='table' then target[kind]={} end
+        if type(source[kind])=='table' then
+            for id,value in pairs(source[kind]) do if value then target[kind][id]=true end end
+        end
+    end
+end
+
+function F.NormalizePetFoodProfiles()
+    if F.db.petFoodListsVersion==3 then return end
+    local normalized={}
+    for key,profile in pairs(F.db.petFoodLists) do
+        if type(profile)=='table' then
+            local targetKey=key
+            if type(profile.name)=='string' and profile.name:find('%S') and type(profile.family)=='string' and profile.family:find('%S') then
+                targetKey=F.PetFoodProfileKey(profile.name,profile.family)
+            end
+            if normalized[targetKey] then mergeFoodRules(normalized[targetKey],profile)
+            else normalized[targetKey]=profile end
+        end
+    end
+    F.db.petFoodLists=normalized;F.db.petFoodListsVersion=3
+end
+
+function F.FoodLists(create)
     local key=F.CurrentPetKey()
     if not key then return F.db end
     F.db.petFoodLists=F.db.petFoodLists or {}
+    local guid=UnitGUID and UnitGUID('pet')
+    local name=UnitName and UnitName('pet')
+    local family=UnitCreatureFamily and UnitCreatureFamily('pet')
+    if not public(name) then name=nil end
+    if not public(family) then family=nil end
+    if key~=guid and public(guid) and type(F.db.petFoodLists[guid])=='table' then
+        -- The exact current GUID identifies this legacy entry safely. Never
+        -- infer a family from a name shared by potentially different pets.
+        local legacy=F.db.petFoodLists[guid]
+        if type(F.db.petFoodLists[key])=='table' then mergeFoodRules(F.db.petFoodLists[key],legacy)
+        else F.db.petFoodLists[key]=legacy end
+        F.db.petFoodLists[guid]=nil
+    end
     local profile=F.db.petFoodLists[key]
     if type(profile)~="table" then
+        F.sessionPetFoodLists=F.sessionPetFoodLists or {}
+        profile=F.sessionPetFoodLists[key]
+        if type(profile)~='table' then
         profile={whitelist={},blacklist={}}
         -- Preserve existing food protection as the starting point for each pet.
         for _,kind in ipairs({"whitelist","blacklist"}) do
             for id,value in pairs(F.db[kind]) do profile[kind][id]=value end
         end
-        F.db.petFoodLists[key]=profile
+        F.sessionPetFoodLists[key]=profile
+        local previous=F.petFoodGuidProfiles and F.petFoodGuidProfiles[guid]
+        if previous and previous.key~=key and previous.profile.family==family then
+            mergeFoodRules(profile,previous.profile)
+            if F.db.petFoodLists[previous.key]==previous.profile then F.db.petFoodLists[key]=profile end
+        end
+        end
+        -- Save summoned pets only after their name and family are available.
+        -- A GUID-only fallback stays transient to avoid duplicate legacy records.
+        if create or key~=guid then F.db.petFoodLists[key]=profile end
     end
     for _,kind in ipairs({"whitelist","blacklist"}) do
         if type(profile[kind])~="table" then profile[kind]={} end
     end
-    local name=UnitName and UnitName("pet")
     if public(name) and type(name)=="string" and name:find("%S") then profile.name=name end
+    if type(family)=='string' and family:find('%S') then profile.family=family end
+    if public(guid) and type(guid)=='string' then
+        F.petFoodGuidProfiles=F.petFoodGuidProfiles or {};F.petFoodGuidProfiles[guid]={key=key,profile=profile}
+    end
     return profile
 end
 
+function F.PetListDeletionBlocked(key)
+    if InCombatLockdown() then return true end
+    if key==F.CurrentPetKey() then return true end
+    local profile=F.db.petFoodLists[key]
+    local guid=UnitGUID and UnitGUID('pet')
+    if not public(guid) or not guid then return false end
+    if key==guid then return true end
+    local name=UnitName and UnitName('pet')
+    if type(profile)=='table' and not profile.family and public(name) and type(name)=='string' and type(profile.name)=='string' then
+        return profile.name:lower()==name:lower()
+    end
+    return false
+end
 function F.DeletePetLists(key)
     if InCombatLockdown() then return false,"Delete lists after combat." end
-    if key==F.CurrentPetKey() then return false,"Dismiss or switch pets before deleting its saved lists." end
+    if F.PetListDeletionBlocked(key) then return false,"Dismiss or switch pets before deleting its saved lists. Unknown-family entries with your pet's name are protected too." end
     if not key or not F.db.petFoodLists[key] then return false,"No saved lists selected." end
     F.db.petFoodLists[key]=nil
+    if F.sessionPetFoodLists then F.sessionPetFoodLists[key]=nil end
+    for guid,entry in pairs(F.petFoodGuidProfiles or {}) do if entry.key==key then F.petFoodGuidProfiles[guid]=nil end end
     return true,"Saved pet food lists deleted."
+end
+
+function F.SavedPetListGroups()
+    local byKey={}
+    for key,profile in pairs(F.db.petFoodLists) do
+        local name=type(profile.name)=='string' and profile.name or 'Unnamed pet'
+        local family=type(profile.family)=='string' and profile.family or 'Family unknown (legacy)'
+        local id=F.PetFoodProfileKey(name,family)
+        local group=byKey[id]
+        if not group then group={id=id,name=name,family=family,keys={},allowed=0,blocked=0};byKey[id]=group end
+        group.keys[#group.keys+1]=key
+        if F.PetListDeletionBlocked(key) then group.active=true end
+        for _ in pairs(profile.whitelist or {}) do group.allowed=group.allowed+1 end
+        for _ in pairs(profile.blacklist or {}) do group.blocked=group.blocked+1 end
+    end
+    local groups={};for _,group in pairs(byKey) do table.sort(group.keys);groups[#groups+1]=group end
+    table.sort(groups,function(a,b) return a.id<b.id end);return groups
+end
+function F.InactivePetListKeys()
+    local keys={}
+    for key in pairs(F.db.petFoodLists) do if not F.PetListDeletionBlocked(key) then keys[#keys+1]=key end end
+    table.sort(keys);return keys
+end
+function F.DeleteSavedPetLists(keys)
+    if InCombatLockdown() then return false,'Delete lists after combat.' end
+    for _,key in ipairs(keys) do
+        if not F.db.petFoodLists[key] or F.PetListDeletionBlocked(key) then return false,'Selection changed or includes your current pet. Select and confirm again.' end
+    end
+    for _,key in ipairs(keys) do
+        F.db.petFoodLists[key]=nil;if F.sessionPetFoodLists then F.sessionPetFoodLists[key]=nil end
+        for guid,entry in pairs(F.petFoodGuidProfiles or {}) do if entry.key==key then F.petFoodGuidProfiles[guid]=nil end end
+    end
+    return true,('Deleted %d saved pet food record%s.'):format(#keys,#keys==1 and '' or 's')
 end
 
 function F.FoodAllowed(id)
@@ -161,7 +274,7 @@ function F.ListCommand(text)
     local list, action, item = text:match('^%s*(%S+)%s+(%S+)%s*(.-)%s*$')
     list, action = list and list:lower(), action and action:lower()
     if list ~= 'whitelist' and list ~= 'blacklist' then return false end
-    local lists=F.FoodLists()
+    local lists=F.FoodLists(action=='add' or action=='remove' or action=='clear')
     local entries = lists[list]
     if action == 'list' then
         local ids = {}
@@ -200,13 +313,39 @@ function F.PreferFood(food, best)
     return food.count < best.count
 end
 
+function F.QueueFoodEntryScan()
+    F.foodEntryPending=true
+    F.foodEntryReadyAt=GetTime()+10
+    F.foodEntrySnapshot=nil
+    F.food=nil; F.foodCount=nil; F.pendingItems=true
+    F.bagsDirty=true
+end
+
+function F.ConfirmFoodEntryScan(count,pending,locked)
+    if not F.foodEntryPending then return end
+    local now=GetTime()
+    if now<F.foodEntryReadyAt or pending or locked then F.foodEntrySnapshot=nil; return end
+    local pet=UnitGUID and UnitGUID('pet')
+    if not public(pet) or not pet then F.foodEntrySnapshot=nil; return end
+    local snapshot=F.foodEntrySnapshot
+    if not snapshot or snapshot.count~=count or snapshot.pet~=pet then
+        F.foodEntrySnapshot={count=count,pet=pet,at=now}; return
+    end
+    if now-snapshot.at<2 then return end
+    F.foodEntryPending=nil; F.foodEntrySnapshot=nil
+end
+
 function F.FindFood()
     if InCombatLockdown and InCombatLockdown() then return end
     if F.ScanQuestFood then F.ScanQuestFood() end
     local best, count, pending, locked = nil, 0, false, false
     F.protectedFoodReasons={}
     for bag = 0, (NUM_TOTAL_EQUIPPED_BAG_SLOTS or NUM_BAG_SLOTS or 4) do
-        for slot = 1, C_Container.GetContainerNumSlots(bag) do
+        local slots=C_Container.GetContainerNumSlots(bag)
+        if not public(slots) or type(slots)~='number' or slots<0 then
+            pending=true; slots=0
+        elseif bag==0 and slots==0 then pending=true end
+        for slot = 1, slots do
             local item = C_Container.GetContainerItemInfo(bag, slot)
             if item and public(item.itemID) and item.itemID and item.stackCount > 0 and F.FoodProtectionReason then
                 local protection=F.FoodProtectionReason(item.itemID)
@@ -239,6 +378,7 @@ function F.FindFood()
     end
     F.food, F.foodCount = best, count
     F.pendingItems, F.lockedFood, F.bagsDirty = pending, locked, false
+    F.ConfirmFoodEntryScan(count,pending,locked)
     return best
 end
 
@@ -342,6 +482,7 @@ end
 
 function F.CheckTextReminder(state, reason)
     if InCombatLockdown() or not F.db.enabled then return end
+    if F.foodEntryPending then return end
     if reason == "Pet is happy" or reason == "No pet" or reason == "Pet is dead" then
         F.lastTextReminder = nil
         F.reminderPet = nil
@@ -380,6 +521,7 @@ end
 
 function F.CheckLowFood(state, reason)
     if InCombatLockdown() or not F.db.enabled then return end
+    if F.foodEntryPending then return end
     if reason == "No pet" or reason == "Pet is dead" or reason == "Hunter only" then
         F.lowFoodPet=nil; F.lowFoodAlerted=nil; return
     end
@@ -404,8 +546,9 @@ end
 function F.Refresh(forceScan)
     if not F.button or InCombatLockdown() or F.clickInProgress then return end
     if F.dragging then F.Disarm(); return end
-    if not F.db.enabled then F.Disarm(); F.button:Hide(); return end
     F.FoodLists()
+    if not F.db.enabled then F.Disarm(); F.button:Hide(); return end
+    if F.foodEntryPending then forceScan=true end
     local state, reason = F.GetState()
     F.reason = reason
     F.CheckHungerSound(state, reason)
@@ -471,18 +614,42 @@ end
 
 function F.PreClick(_, mouseButton)
     if InCombatLockdown() then return end
+    F.pendingFeedNotice=nil
     -- Re-read the bags immediately before the protected click. A bag sort, trade,
     -- sold stack or different pet must never leave the old slot armed.
     F.Refresh(true)
-    if mouseButton ~= "LeftButton" or IsShiftKeyDown() or F.dragging
+    local blocked=mouseButton ~= "LeftButton" or IsShiftKeyDown() or F.dragging
         or GetTime() < (F.dragStoppedAt or -1) + 0.3
         or (SpellIsTargeting and SpellIsTargeting())
-        or (GetCursorInfo and GetCursorInfo()) then
+        or (GetCursorInfo and GetCursorInfo())
+    if blocked then
         F.Disarm()
+    elseif F.mode=='food' and F.food and public(F.food.name) and type(F.food.name)=='string' then
+        local pet=UnitGUID and UnitGUID('pet')
+        if public(pet) and pet then
+            F.pendingFeedNotice={pet=pet,name=F.ReminderPetName(),food=F.food.name,at=GetTime()}
+        end
     end
     -- Synchronous spell/bag events can run inside the protected click. Keep its
     -- item-target attributes intact until Blizzard finishes the whole action.
     F.clickInProgress = true
+end
+
+function F.HandleFeedCastEvent(event,unit,spellID)
+    if not public(unit) or not public(spellID) or unit~='player' or spellID~=F.FEED_SPELL then return end
+    local notice=F.pendingFeedNotice
+    F.pendingFeedNotice=nil
+    if event~='UNIT_SPELLCAST_SUCCEEDED' then return end
+    F.waitUntil=GetTime()+1
+    if not notice or GetTime()-notice.at>5 or InCombatLockdown() then return end
+    local pet=UnitGUID and UnitGUID('pet')
+    if not public(pet) or pet~=notice.pet then return end
+    local timestamp=time and time()
+    if public(timestamp) and type(timestamp)=='number' then
+        F.db.petLastFeeds=type(F.db.petLastFeeds)=='table' and F.db.petLastFeeds or {}
+        F.db.petLastFeeds[pet]={food=notice.food,at=timestamp}
+    end
+    F.Print('Fed '..notice.name..' a delicious '..notice.food)
 end
 
 function F.PostClick(_, mouseButton)
