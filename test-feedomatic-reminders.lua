@@ -87,19 +87,22 @@ print('PASS: supply thresholds, restock reset, pet changes, suppression, toggles
 
 F.db.whitelist={}; F.db.blacklist={[99]=true}; F.db.petFoodLists={}
 UnitGUID=function() return 'pet-one' end; UnitName=function() return 'Fang' end
-local one=F.FoodLists(); assert(one.name=='Fang' and one.blacklist[99])
+UnitCreatureFamily=function() return 'Wolf' end
+local one=F.FoodLists(true); local oneKey=F.CurrentPetKey();assert(one.name=='Fang' and one.blacklist[99])
 one.blacklist[1]=true; one.whitelist[2]=true
 assert(not F.FoodAllowed(1) and F.FoodAllowed(2) and not F.FoodAllowed(3))
 UnitGUID=function() return 'pet-two' end; UnitName=function() return 'Fang' end
-local two=F.FoodLists(); assert(two~=one and not two.blacklist[1] and not two.whitelist[2])
+UnitCreatureFamily=function() return 'Cat' end
+local two=F.FoodLists(true);local twoKey=F.CurrentPetKey();assert(two~=one and not two.blacklist[1] and not two.whitelist[2])
 two.whitelist[3]=true; assert(F.FoodAllowed(3) and not F.FoodAllowed(2))
 UnitGUID=function() return 'pet-one' end; UnitName=function() return 'Renamed Fang' end
-assert(F.FoodLists()==one and one.name=='Renamed Fang' and F.FoodAllowed(2))
-assert(not F.DeletePetLists('pet-one'))
-assert(F.DeletePetLists('pet-two') and F.db.petFoodLists['pet-two']==nil)
+UnitCreatureFamily=function() return 'Wolf' end
+assert(F.FoodLists().name=='Renamed Fang' and F.FoodAllowed(2))
+assert(not F.DeletePetLists(F.CurrentPetKey()))
+assert(F.DeletePetLists(twoKey) and F.db.petFoodLists[twoKey]==nil)
 UnitGUID=function() return nil end; assert(F.FoodLists()==F.db)
-assert(F.DeletePetLists('pet-one'))
+assert(F.DeletePetLists(oneKey))
 InCombatLockdown=function() return true end
 UnitGUID=function() error('restricted pet query') end; assert(F.FoodLists()==F.db)
 InCombatLockdown=function() return false end; UnitGUID=nil; UnitName=nil
-print('PASS: per-pet list isolation, duplicate names, rename persistence, defaults, deletion and combat guard')
+print('PASS: name/family isolation, duplicate names across families, rename-rule preservation, defaults, deletion and combat guard')
