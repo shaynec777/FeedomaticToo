@@ -38,7 +38,7 @@ function F.OpenFoodProtection()
     F.SpecialFoodSettings()
     if F.protectionPanel then F.protectionPanel:Show(); return end
     local p=CreateFrame('Frame','HunterToolsFoodProtection',UIParent,'BackdropTemplate'); F.protectionPanel=p
-    p:SetSize(480,270); p:SetPoint('CENTER'); p:SetFrameStrata('FULLSCREEN_DIALOG')
+    p:SetSize(480,310); p:SetPoint('CENTER'); p:SetFrameStrata('FULLSCREEN_DIALOG')
     p:SetBackdrop({bgFile='Interface\\DialogFrame\\UI-DialogBox-Background',edgeFile='Interface\\DialogFrame\\UI-DialogBox-Border',edgeSize=24})
     local title=p:CreateFontString(nil,'OVERLAY','GameFontNormalLarge'); title:SetPoint('TOP',0,-25); title:SetText('Food protection')
     local close=CreateFrame('Button',nil,p,'UIPanelCloseButton'); close:SetPoint('TOPRIGHT',-4,-4)
@@ -53,5 +53,8 @@ function F.OpenFoodProtection()
     end
     local help=p:CreateFontString(nil,'OVERLAY','GameFontHighlightSmall'); help:SetPoint('TOPLEFT',30,-185); help:SetWidth(420)
     help:SetText('Protection overrides allowed lists. Cooking uses the client Food & Drink ingredient category. Buff detection uses English Well Fed tooltip text; block other special foods manually.')
+    local back=CreateFrame('Button',nil,p,'UIPanelButtonTemplate');back:SetSize(180,26);back:SetPoint('BOTTOM',0,24);back:SetText('Back to food catalog')
+    back:SetScript('OnClick',function() p:Hide();F.OpenFoodList() end)
+    if F.FinishMenu then F.FinishMenu(p,480,310) end
     table.insert(UISpecialFrames,'HunterToolsFoodProtection')
 end

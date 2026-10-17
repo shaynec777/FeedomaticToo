@@ -33,7 +33,7 @@ local function widget()
  function w:Hide() self.shown=false end
  frames[#frames+1]=w;return w
 end
-CreateFrame=widget;UIParent={};F.Print=function() end
+CreateFrame=widget;UIParent={};UISpecialFrames={};F.Print=function() end
 assert(loadfile('HunterTools/FoodList.lua'))('test',F)
 guid=nil;F.OpenPetLists();local p=F.petListPanel
 local selected,all,nextButton

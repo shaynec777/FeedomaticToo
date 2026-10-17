@@ -50,49 +50,66 @@ function F.UpdateFoodCatalog()
 end
 function F.OpenFoodList()
     if InCombatLockdown() then F.Print('Open the food list after combat.'); return end
+    if F.HideConfigPages then F.HideConfigPages() end
     F.UpdateFoodCatalog()
     if F.foodPanel then F.foodPanel.page=1; F.foodPanel:Show(); F.foodPanel:Refresh(); return end
     local p=CreateFrame('Frame','GFWForeverFoodList',UIParent,'BackdropTemplate')
     F.foodPanel=p
-    p:SetSize(680,780); p:SetPoint('CENTER'); p:SetFrameStrata('DIALOG')
+    p:SetSize(680,590); p:SetPoint('CENTER'); p:SetFrameStrata('DIALOG')
     p:SetMovable(true); p:EnableMouse(true); p:RegisterForDrag('LeftButton')
     p:SetScript('OnDragStart',p.StartMoving); p:SetScript('OnDragStop',p.StopMovingOrSizing)
     p:SetBackdrop({bgFile='Interface\\DialogFrame\\UI-DialogBox-Background',edgeFile='Interface\\DialogFrame\\UI-DialogBox-Border',edgeSize=24})
     local title=p:CreateFontString(nil,'OVERLAY','GameFontNormalLarge')
     title:SetPoint('TOP',0,-18); title:SetText('HunterTools food list')
     local close=CreateFrame('Button',nil,p,'UIPanelCloseButton'); close:SetPoint('TOPRIGHT',-4,-4)
+    -- Keep the searchable catalog separate from feeding preferences.
+    p.catalogPage=CreateFrame('Frame',nil,p);p.catalogPage:SetAllPoints(p)
+    p.feedingPage=CreateFrame('Frame',nil,p);p.feedingPage:SetAllPoints(p)
+    p.catalogList=CreateFrame('Frame',nil,p.catalogPage);p.catalogList:SetSize(680,590);p.catalogList:SetPoint('TOPLEFT',0,252)
+    p.tabs={}
+    function p:SelectTab(key)
+        self.activeTab=key;self.catalogPage:SetShown(key=='catalog');self.feedingPage:SetShown(key=='feeding')
+        for name,tab in pairs(self.tabs) do tab:SetText((name==key and '|cffffd16a' or '')..tab.caption..(name==key and '|r' or ''));tab:SetEnabled(name~=key) end
+    end
+    for i,spec in ipairs({{'catalog','Food catalog'},{'feeding','Feeding & alerts'}}) do
+        local key=spec[1];local tab=CreateFrame('Button',nil,p,'UIPanelButtonTemplate')
+        tab:SetSize(304,30);tab:SetPoint('TOPLEFT',25+(i-1)*326,-58);tab.caption=spec[2];p.tabs[key]=tab
+        tab:SetScript('OnClick',function() p:SelectTab(key) end)
+    end
+    p:SelectTab('catalog')
     p.editList='blacklist'
-    local editMode=CreateFrame('Button',nil,p,'UIPanelButtonTemplate')
-    editMode:SetSize(280,25); editMode:SetPoint('TOPLEFT',350,-110)
+    local editMode=CreateFrame('Button',nil,p.catalogPage,'UIPanelButtonTemplate')
+    editMode:SetSize(280,25); editMode:SetPoint('TOPLEFT',25,-140)
     editMode:SetScript('OnClick',function()
         p.editList=p.editList=='blacklist' and 'whitelist' or 'blacklist'; p:Refresh()
     end)
     local ammo=CreateFrame('Button',nil,p,'UIPanelButtonTemplate')
-    ammo:SetSize(140,24); ammo:SetPoint('BOTTOMLEFT',25,16); ammo:SetText('Back to settings')
+    ammo:SetSize(140,24); ammo:SetPoint('BOTTOMLEFT',25,16); ammo:SetText('Back to tools')
     ammo:SetScript('OnClick',function() p:Hide(); F.OpenConfig() end)
     local manage=CreateFrame('Button',nil,p,'UIPanelButtonTemplate')
     manage:SetSize(130,24); manage:SetPoint('BOTTOMRIGHT',-25,16)
     manage:SetText('Saved pet lists'); manage:SetScript('OnClick',function() F.OpenPetLists() end)
-    local search=CreateFrame('EditBox',nil,p,'InputBoxTemplate'); p.search=search
-    search:SetSize(440,25); search:SetPoint('TOPLEFT',30,-55); search:SetAutoFocus(false)
-    local protection=CreateFrame('Button',nil,p,'UIPanelButtonTemplate')
-    protection:SetSize(145,25); protection:SetPoint('TOPLEFT',495,-55); protection:SetText('Food protection')
+    local search=CreateFrame('EditBox',nil,p.catalogPage,'InputBoxTemplate'); p.search=search
+    search:SetSize(440,25); search:SetPoint('TOPLEFT',30,-102); search:SetAutoFocus(false)
+    local protection=CreateFrame('Button',nil,p.catalogPage,'UIPanelButtonTemplate')
+    protection:SetSize(145,25); protection:SetPoint('TOPLEFT',495,-102); protection:SetText('Food protection')
     protection:SetScript('OnClick',function() F.OpenFoodProtection() end)
     search:SetScript('OnEscapePressed',function(self) self:ClearFocus() end)
-    local help=p:CreateFontString(nil,'OVERLAY','GameFontHighlightSmall')
-    help:SetPoint('TOPLEFT',25,-90); help:SetText('Food rows: check to block; uncheck to allow (whitelist still applies). Saves immediately.')
-    local order=CreateFrame('Button',nil,p,'UIPanelButtonTemplate')
+    local help=p.catalogPage:CreateFontString(nil,'OVERLAY','GameFontHighlightSmall')
+    help:SetPoint('TOPLEFT',25,-174); help:SetText('Search foods, then check the boxes to edit the selected list. Changes save immediately.')
+    local order=CreateFrame('Button',nil,p.feedingPage,'UIPanelButtonTemplate')
     order:SetSize(280,25); order:SetPoint('TOPLEFT',25,-110)
     order:SetScript('OnClick',function()
         F.db.foodOrder=F.db.foodOrder=='low' and 'high' or 'low'
         F.bagsDirty=true; F.Refresh(true); p:Refresh()
     end)
-    local explanation=p:CreateFontString(nil,'OVERLAY','GameFontHighlightSmall')
+    local explanation=p.feedingPage:CreateFontString(nil,'OVERLAY','GameFontHighlightSmall')
     explanation:SetPoint('TOPLEFT',25,-145); explanation:SetWidth(630)
     explanation:SetJustifyH('LEFT')
     explanation:SetText('Chooses unlocked food in your bags that your pet can eat. Blacklist wins; a nonempty whitelist limits choices. Ranks by item level (not vendor price or measured happiness), then uses the smaller stack on ties. Low to high saves higher-level food. Changes affect the next feeding.')
+    local checkParent=p.feedingPage
     local function checkbox(label,x,y,checked,change)
-        local c=CreateFrame('CheckButton',nil,p,'UICheckButtonTemplate')
+        local c=CreateFrame('CheckButton',nil,checkParent,'UICheckButtonTemplate')
         c:SetPoint('TOPLEFT',x,y); c:SetChecked(checked)
         local text=c:CreateFontString(nil,'OVERLAY','GameFontHighlightSmall')
         text:SetPoint('LEFT',c,'RIGHT',2,0); text:SetText(label)
@@ -101,13 +118,13 @@ function F.OpenFoodList()
     end
     checkbox('Use default wolf sound',22,-205,F.db.wolfSound,function(value) F.db.wolfSound=value end)
     checkbox('Mute hunger sounds',250,-205,F.db.mute,function(value) F.db.mute=value end)
-    local testSound=CreateFrame('Button',nil,p,'UIPanelButtonTemplate')
+    local testSound=CreateFrame('Button',nil,p.feedingPage,'UIPanelButtonTemplate')
     testSound:SetSize(100,24); testSound:SetPoint('TOPLEFT',530,-209); testSound:SetText('Test sound')
     testSound:SetScript('OnClick',function() F.PlayHungerSound(true) end)
-    local soundHelp=p:CreateFontString(nil,'OVERLAY','GameFontHighlightSmall')
+    local soundHelp=p.feedingPage:CreateFontString(nil,'OVERLAY','GameFontHighlightSmall')
     soundHelp:SetPoint('TOPLEFT',25,-241)
     soundHelp:SetText('Unchecked: pet-family sound, with wolf fallback. Mute overrides both. Uses Master volume.')
-    local reminderMode=CreateFrame('Button',nil,p,'UIPanelButtonTemplate')
+    local reminderMode=CreateFrame('Button',nil,p.feedingPage,'UIPanelButtonTemplate')
     reminderMode:SetSize(280,25); reminderMode:SetPoint('TOPLEFT',25,-265)
     local modes={'off','chat','screen','both'}
     local modeLabels={off='Off',chat='Chat',screen='On-screen',both='Both'}
@@ -121,13 +138,13 @@ function F.OpenFoodList()
         end
         updateReminderLabel()
     end)
-    local testReminder=CreateFrame('Button',nil,p,'UIPanelButtonTemplate')
+    local testReminder=CreateFrame('Button',nil,p.feedingPage,'UIPanelButtonTemplate')
     testReminder:SetSize(125,25); testReminder:SetPoint('TOPLEFT',505,-265)
     testReminder:SetText('Test reminder')
     testReminder:SetScript('OnClick',function() F.ShowTextReminder(true) end)
-    local repeatLabel=p:CreateFontString(nil,'OVERLAY','GameFontHighlightSmall')
+    local repeatLabel=p.feedingPage:CreateFontString(nil,'OVERLAY','GameFontHighlightSmall')
     repeatLabel:SetPoint('TOPLEFT',25,-308); repeatLabel:SetText('Repeat every (minutes):')
-    local minutes=CreateFrame('EditBox',nil,p,'InputBoxTemplate')
+    local minutes=CreateFrame('EditBox',nil,p.feedingPage,'InputBoxTemplate')
     minutes:SetSize(55,25); minutes:SetPoint('TOPLEFT',190,-300); minutes:SetAutoFocus(false)
     minutes:SetMaxLetters(6); minutes:SetText(tostring(F.db.reminderMinutes))
     local function saveInterval(self)
@@ -146,9 +163,9 @@ function F.OpenFoodList()
     minutes:SetScript('OnEscapePressed',function(self)
         self:SetText(tostring(F.db.reminderMinutes)); self:ClearFocus()
     end)
-    local repeatHelp=p:CreateFontString(nil,'OVERLAY','GameFontHighlightSmall')
+    local repeatHelp=p.feedingPage:CreateFontString(nil,'OVERLAY','GameFontHighlightSmall')
     repeatHelp:SetPoint('TOPLEFT',260,-308); repeatHelp:SetText('0 = once. Range: 0-120. Press Enter to save.')
-    local reminderHelp=p:CreateFontString(nil,'OVERLAY','GameFontHighlightSmall')
+    local reminderHelp=p.feedingPage:CreateFontString(nil,'OVERLAY','GameFontHighlightSmall')
     reminderHelp:SetPoint('TOPLEFT',25,-334)
     reminderHelp:SetText('Private reminders only. First alert when hungry; repeats pause during combat or feeding.')
     checkbox('Food count on button',22,-353,F.db.showFoodCount,function(value)
@@ -157,9 +174,9 @@ function F.OpenFoodList()
     checkbox('Low-food warning (chat)',250,-353,F.db.lowFoodWarning,function(value)
         F.db.lowFoodWarning=value; F.lowFoodAlerted=nil; F.Refresh()
     end)
-    local supplyLabel=p:CreateFontString(nil,'OVERLAY','GameFontHighlightSmall')
+    local supplyLabel=p.feedingPage:CreateFontString(nil,'OVERLAY','GameFontHighlightSmall')
     supplyLabel:SetPoint('TOPLEFT',25,-395); supplyLabel:SetText('Warn at or below:')
-    local threshold=CreateFrame('EditBox',nil,p,'InputBoxTemplate')
+    local threshold=CreateFrame('EditBox',nil,p.feedingPage,'InputBoxTemplate')
     threshold:SetSize(45,25); threshold:SetPoint('TOPLEFT',135,-387)
     threshold:SetAutoFocus(false); threshold:SetMaxLetters(3)
     threshold:SetText(tostring(F.db.lowFoodThreshold))
@@ -177,16 +194,17 @@ function F.OpenFoodList()
     threshold:SetScript('OnEscapePressed',function(self)
         self:SetText(tostring(F.db.lowFoodThreshold)); self:ClearFocus()
     end)
-    local supplyHelp=p:CreateFontString(nil,'OVERLAY','GameFontHighlightSmall')
+    local supplyHelp=p.feedingPage:CreateFontString(nil,'OVERLAY','GameFontHighlightSmall')
     supplyHelp:SetPoint('TOPLEFT',195,-395)
     supplyHelp:SetText('Allowed food items. Warn once; restocking resets. + = incomplete count.')
     checkbox('Protect food for active quests',22,-410,F.db.protectQuestFood,function(value)
         F.db.protectQuestFood=value
         F.bagsDirty=true; F.Refresh(true); F.UpdateFoodCatalog(); p:Refresh()
     end)
-    local questHelp=p:CreateFontString(nil,'OVERLAY','GameFontHighlightSmall')
+    local questHelp=p.feedingPage:CreateFontString(nil,'OVERLAY','GameFontHighlightSmall')
     questHelp:SetPoint('TOPLEFT',310,-421)
     questHelp:SetText('All stacks, until turn-in or abandonment.')
+    checkParent=p.catalogList
     p.filters={}
     for _,spec in ipairs({{'In bags','inBags',22},{'Edible by current pet','edible',175},{'Blocked','blocked',415}}) do
         local key=spec[2]
@@ -194,12 +212,12 @@ function F.OpenFoodList()
             p.filters[key]=value; p.page=1; p:Refresh()
         end)
     end
-    local blockHelp=p:CreateFontString(nil,'OVERLAY','GameFontNormal')
+    local blockHelp=p.catalogList:CreateFontString(nil,'OVERLAY','GameFontNormal')
     blockHelp:SetPoint('TOPLEFT',25,-479)
     p.blockHelp=blockHelp
     p.rows={}; p.page=1
     for i=1,9 do
-        local row=CreateFrame('CheckButton',nil,p,'UICheckButtonTemplate')
+        local row=CreateFrame('CheckButton',nil,p.catalogList,'UICheckButtonTemplate')
         row:SetPoint('TOPLEFT',22,-501-(i-1)*25)
         row.text=row:CreateFontString(nil,'OVERLAY','GameFontHighlightSmall')
         row.icon=row:CreateTexture(nil,'ARTWORK')
@@ -220,7 +238,7 @@ function F.OpenFoodList()
             GameTooltip:Show()
         end)
         row:SetScript('OnLeave',function() GameTooltip:Hide() end)
-        row.header=p:CreateFontString(nil,'OVERLAY','GameFontNormal')
+        row.header=p.catalogList:CreateFontString(nil,'OVERLAY','GameFontNormal')
         row.header:SetPoint('TOPLEFT',25,-506-(i-1)*25)
         row:SetScript('OnClick',function(self)
             if not self.id then return end
@@ -229,11 +247,11 @@ function F.OpenFoodList()
         end)
         p.rows[i]=row
     end
-    local status=p:CreateFontString(nil,'OVERLAY','GameFontNormalSmall'); p.status=status
-    status:SetPoint('BOTTOM',0,48)
+    local status=p.catalogPage:CreateFontString(nil,'OVERLAY','GameFontNormalSmall'); p.status=status
+    status:SetPoint('BOTTOM',0,80)
     for _,spec in ipairs({{'Previous',-1,-100},{'Next',1,100}}) do
-        local b=CreateFrame('Button',nil,p,'UIPanelButtonTemplate')
-        b:SetSize(85,24); b:SetPoint('BOTTOM',spec[3],16); b:SetText(spec[1])
+        local b=CreateFrame('Button',nil,p.catalogPage,'UIPanelButtonTemplate')
+        b:SetSize(85,24); b:SetPoint('BOTTOM',spec[3],48); b:SetText(spec[1])
         local step=spec[2]
         b:SetScript('OnClick',function() p.page=p.page+step; p:Refresh() end)
     end
@@ -287,6 +305,7 @@ function F.OpenFoodList()
         if p:IsShown() and not InCombatLockdown() then F.UpdateFoodCatalog(); p:Refresh() end
     end)
     table.insert(UISpecialFrames,'GFWForeverFoodList')
+    if F.FinishMenu then F.FinishMenu(p,680,590) end
     p:Refresh()
 end
 
@@ -294,7 +313,7 @@ function F.OpenPetLists()
     if InCombatLockdown() then F.Print('Manage pet lists after combat.'); return end
     F.FoodLists()
     if F.petListPanel then F.petListPanel:Show(); F.petListPanel:Refresh(); return end
-    local p=CreateFrame('Frame',nil,UIParent,'BackdropTemplate'); F.petListPanel=p
+    local p=CreateFrame('Frame','HunterToolsPetLists',UIParent,'BackdropTemplate'); F.petListPanel=p
     p:SetSize(600,350); p:SetPoint('CENTER'); p:SetFrameStrata('FULLSCREEN_DIALOG');p:SetClampedToScreen(true)
     p:SetBackdrop({bgFile='Interface\\Buttons\\WHITE8X8',edgeFile='Interface\\DialogFrame\\UI-DialogBox-Border',edgeSize=24})
     p:SetBackdropColor(0.055,0.055,0.055,1)
@@ -336,5 +355,9 @@ function F.OpenPetLists()
         if p.confirmAll~=signature then p.confirmAll=signature;deleteAll:SetText(('Confirm delete %d inactive records'):format(#keys));return end
         local ok,message=F.DeleteSavedPetLists(keys);F.Print(message);p:Refresh();result:SetText(message)
     end)
+    local back=CreateFrame('Button',nil,p,'UIPanelButtonTemplate');back:SetSize(180,25);back:SetPoint('BOTTOMLEFT',25,25);back:SetText('Back to food')
+    back:SetScript('OnClick',function() p:Hide();F.OpenFoodList() end)
+    table.insert(UISpecialFrames,'HunterToolsPetLists')
+    if F.FinishMenu then F.FinishMenu(p,600,350) end
     p:Refresh()
 end

@@ -121,6 +121,8 @@ loader:SetScript('OnEvent',function(_,event,a,b,c)
         SlashCmdList.FEEDOMATICTOO=function(text)
             if (text or ''):lower():match('^%s*trainingdebug%s*$') then F.DebugPetTraining(); return end
             if (text or ''):lower():match('^%s*pet%s*$') then local s=F.PetStatusSettings();F.SetToolEnabled('pet',not s.enabled);return end
+            if (text or ''):lower():match('^%s*weapons%s*$') then F.OpenWeaponComparisonSettings();return end
+            if (text or ''):lower():match('^%s*abilities%s*$') then F.OpenPetAbilityBrowser();return end
             if (text or ''):lower():match('^%s*petsettings%s*$') then F.OpenPetStatusSettings();return end
             if (text or ''):lower():match('^%s*range%s*$') then local s=F.RangeSettings(); s.enabled=not s.enabled; F.UpdateRangeWindow(); return end
             if (text or ''):lower():match('^%s*ammodebug%s*$') then F.DebugAmmo(); return end
@@ -131,7 +133,7 @@ loader:SetScript('OnEvent',function(_,event,a,b,c)
             if (text or ''):lower():match('^%s*foods%s*$') then F.OpenFoodList(); return end
             if F.ListCommand(text or '') then return end
             local cmd=(text or ''):lower():match('^%s*(.-)%s*$')
-            if cmd~='on' and cmd~='off' then F.Print('/ht ammo; /ht foods; /ht on|off; /ht whitelist|blacklist add|remove <item link or ID>, list, clear. Shift-drag moves the button.'); return end
+            if cmd~='on' and cmd~='off' then F.Print('/ht weapons; /ht abilities; /ht ammo; /ht foods; /ht on|off; /ht whitelist|blacklist add|remove <item link or ID>, list, clear. Shift-drag moves the button.'); return end
             F.db.enabled=cmd=='on'
             if InCombatLockdown() then F.Print('Visibility will update after combat.'); return end
             F.Refresh()
@@ -158,7 +160,7 @@ loader:SetScript('OnEvent',function(_,event,a,b,c)
     if InCombatLockdown() or F.clickInProgress then return end
     if not F.button then
         F.BuildUI()
-        F.ticker=C_Timer.NewTicker(0.5,function() F.UpdateHappinessBorder(); F.Refresh(); F.CheckAmmoReminder(); F.CheckInstancePrompt(); F.UpdateRangeWindow(); F.UpdatePetStatusWindow() end)
+        F.ticker=C_Timer.NewTicker(0.5,function() F.UpdateHappinessBorder(); F.Refresh(); F.CheckAmmoReminder(); F.CheckAmmoUpgradeNotifications(); F.CheckInstancePrompt(); F.UpdateRangeWindow(); F.UpdatePetStatusWindow() end)
     end
     if F.dragging then
         F.button:StopMovingOrSizing(); F.dragging=false

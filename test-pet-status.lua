@@ -39,11 +39,14 @@ F.PetDietText=function() return 'Pet eats: Fruit, Cheese' end
 F.foodCount=12;F.food={name='Apple'}
 F.FindFood=function() F.bagsDirty=false end
 time=function() return 1000 end
+F.PetRole=function(family) return family=='Tallstrider' and 'Defensive (Classic baseline)' or 'Unknown' end
 assert(loadfile('HunterTools/PetStatus.lua'))('test',F)
-local s=F.PetStatusSettings();assert(not s.enabled and s.tooltipEnabled and #F.petStatusFields==10)
+local s=F.PetStatusSettings();assert(not s.enabled and s.tooltipEnabled and #F.petStatusFields==11)
 s.windowFields.health=false;assert(s.tooltipFields.health,'surfaces must not share their table')
 s.windowFields.health=true
 local d=F.PetStatusData();assert(d.name=='Strider' and d.health=='240 / 300 (80%)')
+assert(d.role=='Defensive (Classic baseline)' and s.windowFields.role and s.tooltipFields.role)
+s.windowFields.role=false;assert(s.tooltipFields.role)
 assert(d.happiness=='Happy • 125% damage' and d.loyalty=='Faithful • rising')
 assert(d.training=='15 available / 40 total (25 spent)' and d.food:find('12 suitable items',1,true))
 F.db.petLastFeeds={['pet-one']={food='Apple',at=880}};assert(F.PetStatusData().lastFeed=='Apple • 2 min ago')

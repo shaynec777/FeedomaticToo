@@ -1,0 +1,31 @@
+local _,F=...
+-- Curated Wowhead Forever projectile stats and source facts, 2026-10-16.
+-- Conditional sources are considered only when already carried. Deprecated/test records are excluded.
+F.ammoUpgradeCatalog={
+ [2512]={kind=2,level=1,dps=1.5,sourceType="vendor",Alliance="Thurman Mullby - Stormwind City",Horde="Trak'gen - Orgrimmar"},
+ [2515]={kind=2,level=10,dps=3.5,sourceType="vendor",Alliance="Thurman Mullby - Stormwind City",Horde="Trak'gen - Orgrimmar"},
+ [2516]={kind=3,level=1,dps=1.5,sourceType="vendor",Alliance="Thurman Mullby - Stormwind City",Horde="Trak'gen - Orgrimmar"},
+ [2519]={kind=3,level=10,dps=3.5,sourceType="vendor",Alliance="Thurman Mullby - Stormwind City",Horde="Trak'gen - Orgrimmar"},
+ [3030]={kind=2,level=25,dps=7.5,sourceType="vendor",Alliance="Thurman Mullby - Stormwind City",Horde="Trak'gen - Orgrimmar"},
+ [3033]={kind=3,level=25,dps=7.5,sourceType="vendor",Alliance="Thurman Mullby - Stormwind City",Horde="Trak'gen - Orgrimmar"},
+ [3464]={kind=2,level=30,dps=9.5,sourceType="conditional",source="Quest reward; exact Forever quest requirements unverified",engineered=false},
+ [3465]={kind=3,level=30,dps=9.5,sourceType="conditional",source="Quest reward; exact Forever quest requirements unverified",engineered=false},
+ [4960]={kind=3,level=1,dps=2,sourceType="conditional",source="Sharing the Land - Mulgore (quest reward)",engineered=false},
+ [5568]={kind=3,level=13,dps=4,sourceType="conditional",source="Zone drop - Darkshore",engineered=false},
+ [8067]={kind=3,level=5,dps=2,engineered=true,sourceType="craft",craftSkill=30},
+ [8068]={kind=3,level=15,dps=4.5,engineered=true,sourceType="craft",craftSkill=75},
+ [8069]={kind=3,level=30,dps=8.5,engineered=true,sourceType="craft",craftSkill=125},
+ [9399]={kind=2,level=35,dps=11.5,sourceType="conditional",source="Baelog - Uldaman (dungeon drop)",engineered=false},
+ [10512]={kind=3,level=37,dps=12.5,engineered=true,sourceType="craft",craftSkill=210},
+ [10513]={kind=3,level=44,dps=15,engineered=true,sourceType="craft",craftSkill=245},
+ [10579]={kind=2,level=37,dps=14.5,sourceType="conditional",source="No verified Forever acquisition source",engineered=false},
+ [11284]={kind=3,level=40,dps=13,sourceType="vendor",Alliance="Thurman Mullby - Stormwind City",Horde="Trak'gen - Orgrimmar"},
+ [11285]={kind=2,level=40,dps=13,sourceType="vendor",Alliance="Thurman Mullby - Stormwind City",Horde="Trak'gen - Orgrimmar"},
+ [11630]={kind=3,level=47,dps=18,sourceType="conditional",source="Lord Roccor - Blackrock Depths (dungeon drop)",engineered=false},
+ [15997]={kind=3,level=52,dps=17.5,engineered=true,sourceType="craft",craftSkill=285},
+ [18042]={kind=2,level=52,dps=17.5,sourceType="conditional",source="Fizzlefuse - Eastern Kingdoms; currency/exchange requirements unverified",engineered=true},
+ [19316]={kind=2,level=51,dps=16.5,sourceType="conditional",Alliance="Thanthaldis Snowgleam - Alterac Mountains; Stormpike reputation requirements need verification",Horde="Jekyll Flandring - Alterac Mountains; Frostwolf reputation requirements need verification"},
+ [19317]={kind=3,level=51,dps=16.5,sourceType="conditional",Alliance="Thanthaldis Snowgleam - Alterac Mountains; Stormpike reputation requirements need verification",Horde="Jekyll Flandring - Alterac Mountains; Frostwolf reputation requirements need verification"},
+ [274387]={kind=2,level=60,dps=24.5,engineered=true,sourceType="craft",craftSkill=300,personalCraft=true},
+ [274388]={kind=3,level=60,dps=24.5,engineered=true,sourceType="craft",craftSkill=300,personalCraft=true},
+}

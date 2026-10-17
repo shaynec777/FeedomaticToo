@@ -94,7 +94,7 @@ local methods={}
 local function frame()
     local f={scripts={},shown=true,text=''}; setmetatable(f,{__index=methods}); frames[#frames+1]=f; return f
 end
-for _,name in ipairs({'SetSize','SetPoint','SetFrameStrata','SetMovable','EnableMouse','RegisterForDrag','SetBackdrop','SetWidth','SetJustifyH','SetAutoFocus','SetMaxLetters','SetTexture','RegisterEvent','StartMoving','StopMovingOrSizing'}) do methods[name]=function() end end
+for _,name in ipairs({'SetEnabled','SetSize','SetPoint','SetFrameStrata','SetMovable','EnableMouse','RegisterForDrag','SetBackdrop','SetWidth','SetJustifyH','SetAutoFocus','SetMaxLetters','SetTexture','RegisterEvent','StartMoving','StopMovingOrSizing'}) do methods[name]=function() end end
 methods.CreateFontString=frame; methods.CreateTexture=frame
 function methods:SetScript(key,fn) self.scripts[key]=fn end
 function methods:SetText(text) self.text=text end
@@ -115,9 +115,9 @@ local row=F.ammoPanel.rows[1]; row:SetChecked(true); row.scripts.OnClick(row); a
 row:SetChecked(false); row.scripts.OnClick(row); assert(not F.db.ammo.selected[row.id])
 local input=row.minimum; input:SetText('350'); input.scripts.OnEnterPressed(input); assert(F.AmmoMinimum(row.id)==350)
 input:SetText('-4'); input.scripts.OnEnterPressed(input); assert(F.AmmoMinimum(row.id)==350)
-find('Check equipped ammo').scripts.OnClick(); assert(F.db.ammo.selected[2512])
-find('Uncheck all').scripts.OnClick(); assert(next(F.db.ammo.selected)==nil)
+find('Monitor equipped ammo').scripts.OnClick(); assert(F.db.ammo.selected[2512])
+find('Clear monitored ammo').scripts.OnClick(); assert(next(F.db.ammo.selected)==nil)
 find('Test reminder').scripts.OnClick()
 F.OpenConfig=function() F.returned=true end
-find('Back to settings').scripts.OnClick(); assert(F.returned and not F.ammoPanel:IsShown())
+find('Back to tools').scripts.OnClick(); assert(F.returned and not F.ammoPanel:IsShown())
 print('PASS: ammo settings builds, pages, selects, validates input, tests and returns to food settings')

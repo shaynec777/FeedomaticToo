@@ -12,7 +12,7 @@ end
 local function number(v) return type(v)=='number' and v==v and math.abs(v)<1e12 end
 local function text(v) return type(v)=='string' and v:find('%S') and v or nil end
 F.petStatusFields={
-    {'identity','Level and family'},{'health','Health'},{'focus','Focus'},
+    {'identity','Level and family'},{'role','Pet role'},{'health','Health'},{'focus','Focus'},
     {'happiness','Happiness and damage modifier'},{'loyalty','Loyalty and trend'},
     {'training','Training points'},{'diet','Diet'},{'food','Food supply and next food'},
     {'feeding','Feeding status'},{'lastFeed','Last successful feeding'},
@@ -46,6 +46,7 @@ function F.PetStatusData()
     local d={name=text(query(UnitName,'pet')) or 'Your pet',guid=query(UnitGUID,'pet')}
     local level=query(UnitLevel,'pet'); local family=text(query(UnitCreatureFamily,'pet'))
     d.identity=(number(level) and level>0 and ('Level '..level) or 'Level unavailable')..' • '..(family or 'Family unavailable')
+    d.role=F.PetRole and F.PetRole(family) or 'Unknown'
     local hp,maxHP=query(UnitHealth,'pet'),query(UnitHealthMax,'pet')
     local focus,maxFocus=query(UnitPower,'pet',2),query(UnitPowerMax,'pet',2)
     d.health=resource(hp,maxHP);d.focus=resource(focus,maxFocus)
@@ -87,7 +88,7 @@ function F.PetStatusData()
     end
     return d
 end
-local labels={identity='Pet',health='Health',focus='Focus',happiness='Happiness',loyalty='Loyalty',training='Training',diet='Diet',food='Food',feeding='Feeding',lastFeed='Last fed'}
+local labels={identity='Pet',role='Role',health='Health',focus='Focus',happiness='Happiness',loyalty='Loyalty',training='Training',diet='Diet',food='Food',feeding='Feeding',lastFeed='Last fed'}
 function F.PetStatusLines(data,fields)
     if data.paused then return {{'Combat','Updates paused until combat ends'}} end
     if data.missing then return {{'Pet','Summon a hunter pet to see its status'}} end

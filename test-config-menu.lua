@@ -4,7 +4,7 @@ local frames={}
 local function widget()
     local w={scripts={}}
     setmetatable(w,{__index=function(_,key)
-        if key=='CreateFontString' then return widget end
+        if key=='CreateFontString' or key=='CreateTexture' then return widget end
         return function() end
     end})
     function w:SetScript(event,fn) self.scripts[event]=fn end
@@ -23,11 +23,19 @@ local function find(text) for _,w in ipairs(frames) do if w.text==text then retu
 F.RangeSettings=function() return {enabled=true} end
 local petSettings={enabled=false,tooltipEnabled=true,locked=false,windowFields={health=true},tooltipFields={health=true}}
 F.PetStatusSettings=function() return petSettings end
+local browserSettings={enabled=true}
+F.PetBrowserSettings=function() return browserSettings end
+F.OpenPetAbilityBrowser=function() F.browserOpened=true end
 F.petStatusFields={{'health','Health'}}
 F.UpdatePetStatusWindow=function() F.petUpdated=true end
 F.ResetPetStatusPosition=function() F.petReset=true end
+F.MenuText=function(parent,text) local t=widget();t:SetText(text);return t end
+F.MenuSection=function() return widget() end
+F.FinishMenu=function() end
 F.OpenConfig(); assert(F.configPanel.shown)
-local settings={}; for _,w in ipairs(frames) do if w.text=='Settings' then table.insert(settings,w) end end; assert(#settings==5); settings[1].scripts.OnClick(); assert(F.foodOpened and not F.configPanel.shown)
+local settings={};for i,key in ipairs({'food','instance','ammo','range','pet','abilities'}) do settings[i]=F.configPanel.actions[key];assert(settings[i]) end; settings[1].scripts.OnClick(); assert(F.foodOpened and not F.configPanel.shown)
+F.OpenConfig();settings[6].scripts.OnClick();assert(F.browserOpened)
+F.SetToolEnabled('abilities',false);assert(not browserSettings.enabled)
 F.OpenConfig(); settings[3].scripts.OnClick(); assert(F.ammoOpened)
 F.OpenConfig(); settings[2].scripts.OnClick()
 assert(F.instanceSettingsPanel.shown and not F.configPanel.shown)
@@ -41,7 +49,7 @@ assert(checks.growl.checked and checks.pack.checked,'repair missing settings on 
 F.db.instanceChecks='bad'; settings[2].scripts.OnClick()
 assert(checks.growl.checked and checks.pack.checked,'repair malformed settings')
 checks.pack.checked=true; checks.pack.scripts.OnClick(); assert(F.db.instanceChecks.pack)
-find('Back to settings').scripts.OnClick(); assert(F.configPanel.shown and not F.instanceSettingsPanel.shown)
+find('Back to tools').scripts.OnClick(); assert(F.configPanel.shown and not F.instanceSettingsPanel.shown)
 settings[5].scripts.OnClick();assert(F.petStatusSettingsPanel.shown and not F.configPanel.shown)
 local p=F.petStatusSettingsPanel
 p.fields.windowFields.health.checked=false;p.fields.windowFields.health.scripts.OnClick()
@@ -51,4 +59,4 @@ F.SetToolEnabled('pet',true);assert(petSettings.enabled and F.ToolEnabled('pet')
 F.HideConfigPages();assert(not p.shown)
 F.configPanel:Hide(); InCombatLockdown=function() return true end
 F.OpenConfig(); assert(not F.configPanel.shown)
-print('PASS: five-tool navigation, independent pet window/tooltip checkboxes, instance toggles and combat guard')
+print('PASS: six-tool card navigation, independent pet window/tooltip checkboxes, instance toggles and combat guard')
