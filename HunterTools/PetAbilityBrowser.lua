@@ -24,7 +24,10 @@ function F.PetBrowserRankStatus(ability,rank)
 end
 function F.PetBrowserAnimalText(animal)
     -- Never combine Classic pet skills with a same-ID Forever identity as if verified.
-    return animal.name..' - '..animal.family..'\nLevel '..animal.levels..' | '..animal.zone
+    local tags={['Observed fresh tame']='Your tame',['Petopia Forever']='Petopia',
+        ['Petopia Forever (Classic-linked)']='Classic-linked',['Petopia community report (unverified)']='Report'}
+    local tag=tags[animal.reference] or 'Classic'
+    return animal.name..' - '..animal.family..' ['..tag..']\nLevel '..animal.levels..' | '..animal.zone
 end
 local function label(parent,text,x,y,width,font)
     local t=parent:CreateFontString(nil,'OVERLAY',font or 'GameFontHighlightSmall')
@@ -44,7 +47,7 @@ function F.OpenPetAnimalWowhead(animal)
     if not url then F.Print('No valid Wowhead NPC link is available for this animal.');return end
     if not F.wowheadLinkPanel then
         local d=CreateFrame('Frame','HunterToolsWowheadLink',UIParent,'BackdropTemplate');F.wowheadLinkPanel=d
-        d:SetSize(640,240);d:SetPoint('CENTER');d:SetFrameStrata('FULLSCREEN_DIALOG');d:SetClampedToScreen(true);d:EnableMouse(true)
+        d:SetSize(640,300);d:SetPoint('CENTER');d:SetFrameStrata('FULLSCREEN_DIALOG');d:SetClampedToScreen(true);d:EnableMouse(true)
         d:SetBackdrop({bgFile='Interface\\DialogFrame\\UI-DialogBox-Background',edgeFile='Interface\\DialogFrame\\UI-DialogBox-Border',edgeSize=24})
         local close=CreateFrame('Button',nil,d,'UIPanelCloseButton');close:SetPoint('TOPRIGHT',-4,-4)
         table.insert(UISpecialFrames,'HunterToolsWowheadLink')
@@ -54,14 +57,30 @@ function F.OpenPetAnimalWowhead(animal)
         d.url:SetScript('OnEscapePressed',function() d:Hide() end)
         d.url:SetScript('OnEnterPressed',function(self) self:HighlightText() end)
         label(d,'Press Ctrl+C to copy this address. Open your browser, paste it into the address bar, and press Enter.',28,-146,580)
-        button(d,'Select address',28,-196,150,function() d.url:SetFocus();d.url:HighlightText() end)
-        button(d,'Close',462,-196,145,function() d:Hide() end)
+        button(d,'Select address',28,-250,150,function() d.url:SetFocus();d.url:HighlightText() end)
+        button(d,'Close',462,-250,145,function() d:Hide() end)
+        local function sourceButton(caption,x,index)
+            local b=button(d,caption,x,-208,180,function()
+                local links=d.sourceLinks or {};local address=links[index]
+                if address then d.url:SetText(address);d.url:SetFocus();d.url:HighlightText();d.status:SetText('Press Ctrl+C to copy. Source: '..caption) end
+            end)
+            return b
+        end
+        -- Explicit choices: the game cannot test websites or open external browsers.
+        d.petopiaButton=sourceButton('Petopia Forever',28,1)
+        d.foreverButton=sourceButton('Wowhead Forever',220,2)
+        d.classicButton=sourceButton('Wowhead Classic',412,3)
         d:SetScript('OnHide',function() d.url:ClearFocus() end)
     end
     local d=F.wowheadLinkPanel
-    if F.FinishMenu then F.FinishMenu(d,640,240) end
+    if F.FinishMenu then F.FinishMenu(d,640,300) end
     d.title:SetText('Wowhead: '..(animal.name or 'Animal'))
     d.status:SetText("Copy this address to open the animal's Wowhead Forever page.")
+    local petopia,forever,classic
+    if F.BeastSourceURLs then petopia,forever,classic=F.BeastSourceURLs(animal.id) end
+    d.sourceLinks={[1]=petopia,[2]=forever or url,[3]=classic or ('https://www.wowhead.com/classic/npc='..animal.id)}
+    d.petopiaButton:SetEnabled(petopia~=nil)
+    if petopia then url=petopia;d.status:SetText('Petopia Forever first; use Wowhead Forever, then Classic if needed.') end
     d.url:SetText(url);d:Show();d.url:SetFocus();d.url:HighlightText()
 
 end
@@ -163,7 +182,7 @@ function F.RefreshPetAbilityBrowser()
         else b:Hide() end
     end
     p.sourceTitle:SetText(('Rank %d | pet level %s'):format(chosen.rank,tostring(chosen.petLevel or '?')))
-    local animals=chosen.animals or {};local animalPages=math.max(1,math.ceil(#animals/6))
+    local animals=F.BeastTeachers and F.BeastTeachers(selected.key,chosen.rank,chosen.animals) or chosen.animals or {};local animalPages=math.max(1,math.ceil(#animals/6))
     p.animalPage=math.min(p.animalPage or 1,animalPages)
     for i,t in ipairs(p.animalRows) do
         local a=animals[(p.animalPage-1)*6+i]
@@ -174,7 +193,7 @@ function F.RefreshPetAbilityBrowser()
         if F.PetAnimalWowheadURL(a) then b:Show() else b:Hide() end
     end
     local state=F.PetBrowserRankStatus(selected,chosen.rank)
-    if #animals>0 then p.sourceNote:SetText(state..'\nTeaching sources: Petopia Classic baseline; verify in Forever.')
+    if #animals>0 then p.sourceNote:SetText(state..'\nYour tame = observed; Report = unverified.\nClassic / Classic-linked: verify in Forever.')
     elseif (chosen.classicSource=='t' or chosen.classicSource=='tw') then p.sourceNote:SetText(state..'\nClassic reference: pet trainer. No verified Forever teacher bundled.')
     else p.sourceNote:SetText(state..'\nNo verified teaching animal or trainer source bundled for this rank.') end
     p.animalPages:SetText(('%d animals | Page %d/%d'):format(#animals,p.animalPage,animalPages))

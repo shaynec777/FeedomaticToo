@@ -16,7 +16,10 @@ function F.OpenAmmoSettings()
     p.tabs={}
     function p:SelectTab(key)
         self.activeTab=key;self.stockPage:SetShown(key=='stock');self.alertPage:SetShown(key=='alerts')
-        for name,tab in pairs(self.tabs) do tab:SetText((name==key and '|cffffd16a' or '')..tab.caption..(name==key and '|r' or ''));tab:SetEnabled(name~=key) end
+        for name,tab in pairs(self.tabs) do
+            tab:SetText((name==key and '|cffffd16a> ' or '')..tab.caption..(name==key and '|r' or ''))
+            tab:SetEnabled(true)
+        end
     end
     for i,spec in ipairs({{'stock','Tracked ammo'},{'alerts','Alert settings'},{'upgrades','Upgrade advice >'}}) do
         local key=spec[1];local tab=CreateFrame('Button',nil,p,'UIPanelButtonTemplate');tab:SetSize(194,30);tab:SetPoint('TOPLEFT',25+(i-1)*208,-58)

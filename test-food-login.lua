@@ -35,3 +35,14 @@ F.Refresh();assert(F.foodEntryPending)
 now=302;F.Refresh();assert(not F.foodEntryPending and F.foodCount==20)
 assert(#warnings==1)
 print('PASS: login empty bags, recovered food, genuine exhaustion, uncached items, quiet-period reset and ticker rescans')
+
+-- Unrelated uncached inventory must not delay a confirmed food scan.
+F.QueueFoodEntryScan();now=400;slots=2
+C_Container.GetContainerItemInfo=function(_,slot) return {itemID=slot,stackCount=20} end
+C_PetInfo.CanPetEatItem=function(id) return id==1 end
+C_Item.GetItemInfo=function(id) assert(id==1,'non-food metadata must not be requested');return 'Food','link',1,10 end
+F.FindFood();now=412;F.FindFood();now=414;F.FindFood()
+assert(not F.foodEntryPending and not F.pendingItems and F.foodCount==20)
+assert(F.HungerMessage()=='Tallstrider is hungry.')
+F.pendingItems=true;assert(F.HungerMessage()=='Tallstrider is hungry.','known food stays usable during a partial scan')
+print('PASS: uncached non-food cannot block food readiness; available food avoids misleading loading alerts')

@@ -8,21 +8,19 @@ HunterTools brings pet feeding, ammunition reminders and upgrades, dungeon check
 
 ## New in this update
 
-- Refreshed menus with illustrated tool cards, readable opaque panels, clearer navigation, and separate food-catalog/feeding-alert and ammo-tracking/alert-settings tabs.
-- New original hunter jackknife logo in the main menu and project artwork.
-- Independently configurable animal mouseover tips and range-target details, including pet role, ability ranks, diet, and matching food quantities in your bags. Own-pet role has its own controls.
-- Pet ability browser (`/ht abilities`): cached learned ranks, next needed or unconfirmed rank, teaching animals, level ranges and zones. Each animal has a copyable Wowhead Forever link. Creature pictures have a saved Show pet pictures switch and a small paging cache.
-- Partial Wowhead Forever creature/family data supplements the Classic teaching reference; unknown abilities remain unknown.
-- Ammo upgrade advice within Ammo Reminder: level/weapon/faction filters, sources, future upgrades, Include engineered ammo, and red [Obsolete] labels. Separate upgrade notifications offer a repeat interval and banner, chat, or both.
-- Depleted equipped-ammo warnings and recommendations based on usable ammunition actually remaining in your bags.
-- **Experimental: ranged weapon comparisons and scope previews** (`/ht weapons`). Compare estimated Auto Shot damage/DPS with your equipped weapon and preview an attached, absent, matching equipped, or known damage scope. This feature is still being validated against the Forever beta.
+- Beast data now includes 622 Petopia Forever creature records, 19 family references, and 32 additional ID-keyed reports from Petopia's community taming sheet, including Vuldren and Ursera. Community reports are labeled unverified; Classic-linked ability teachers remain labeled as such.
+- Beast fields use available local observations first, then Petopia Forever and its community reports, Wowhead Forever, and the retained Classic reference. Missing fields can fall through independently. Family training options are separate from innate abilities.
+- New local beast field journal (`/ht beasts`): save sightings, explicit Beast Lore details, and the first readable spellbook from a newly tamed pet. Collection is enabled by default and can be turned off. Records stay on your character; a copyable export lets you share them manually. Nothing is uploaded automatically.
+- Animal link dialogs offer Petopia, Wowhead Forever and Wowhead Classic copyable addresses, in that order where available.
+- Feeding & alerts now displays a live explanation when reminders are paused. `/ht hungerdebug` prints the current alert status.
 
-### Bug fixes
+## Bug fixes
 
-- An empty ammo-slot selection no longer masks an upgrade by retaining the damage of ammunition you have exhausted. Native carried counts override stale bag snapshots after readiness checks.
-- New beasts with incomplete reference data retain available details rather than losing all animal information.
-- Wowhead buttons use the tested copy dialog; the unsuccessful direct-browser launch attempt has been removed.
-- Saved pet lists now have clearer return navigation and close with Esc. Disabling animal pictures clears their cached models and stops model requests.
+- Hungry text reminders no longer wait indefinitely for inventory loading. Low-food stock warnings still wait for confirmed counts.
+- Check whether an item is edible before requesting its food metadata, so uncached non-food items cannot block the food scan.
+- Show a normal hungry reminder when usable food is already available, rather than a misleading loading message. Locked food has its own explanation.
+- A newly summoned/tamed pet gets its own initial hunger sound rather than inheriting the previous pet's already-alerted state.
+- Selected food and ammo tabs remain clickable and have a clear active marker instead of appearing disabled.
 
 ## Tools and controls
 
@@ -34,7 +32,7 @@ HunterTools brings pet feeding, ammunition reminders and upgrades, dungeon check
 - **Dungeon checks:** offer to disable Growl autocast, your own Aspect of the Pack, or both on entry. Changes require your click and wait until combat ends.
 - **Experimental weapon comparisons and scope previews:** `/ht weapons` enables/disables tooltip estimates and selects the candidate scope preview. Settings are saved per character.
 
-Use `/ht` or `/huntertools` for the tool menu; `/ht foods`, `/ht ammo`, `/ht abilities`, `/ht weapons`, and `/ht petsettings` open their respective controls. `/fom` and `/feedomatictoo` remain aliases. Right-click the feeder or pet-status window for the tool menu. Feeding always requires a click or keypress.
+Use `/ht` or `/huntertools` for the tool menu; `/ht beasts` (collection journal), `/ht hungerdebug` (alert diagnostics), `/ht foods`, `/ht ammo`, `/ht abilities`, `/ht weapons`, and `/ht petsettings` open their respective controls. `/fom` and `/feedomatictoo` remain aliases. Right-click the feeder or pet-status window for the tool menu. Feeding always requires a click or keypress.
 
 ## Experimental ranged comparison formula
 
@@ -54,7 +52,7 @@ Open Beast Training to seed or refresh learned ranks. Learned and missing labels
 
 ## Beta data and testing
 
-Pet roles, diets and teaching sources include a Classic reference and may differ in Forever. Live Beast Lore takes priority. Unknown details remain unknown; we plan to verify and refine the database after Forever leaves beta.
+Pet roles, diets and teaching sources combine Petopia Forever, labeled community reports, local observations, Wowhead Forever and a Classic fallback. Live Beast Lore takes priority. The new collection journal still needs broader in-game testing. Unknown details remain unknown; we plan to verify and refine the database after Forever leaves beta.
 
 The menus, animal tooltip changes, ability browser/copy links, ammo recommendations/notifications and depleted-stock behavior have in-game feedback plus automated regression coverage. One equipped-weapon estimate matched the character sheet; candidate weapon and scope effects still need broader testing and remain Experimental. Aspect of the Pack, combined disable, automatic new-ability tracking and some live Beast Lore paths also need broader checks. My hunter isn't level 40 yet, so I haven't been able to test disabling Aspect of the Pack; please let me know how it goes in the comments.
 
@@ -64,6 +62,6 @@ If a feature doesn't work, please leave a comment describing what happened, whic
 
 Original feeding engine: FeedPetForever by Gideon (MIT licensed). Adaptation and enhancements: OpenAI Codex, directed and tested by the user. Original Feed-O-Matic concept: Gazmik Fizzwidget. Original notices are retained; no affiliation or endorsement is implied. Blizzard client portraits, textures and sounds are referenced rather than bundled. The jackknife logo is original AI-generated project artwork, directed and approved by the user.
 
-Food and partial Forever reference: Wowhead Forever. Pet ability/diet baseline: [Petopia Classic](https://www.wow-petopia.com/classic/abilities.php). See PET-DATA-SOURCES.md and WEAPON-COMPARISONS.md for scope, formula sources and limitations. Buff-food detection recognizes English Well Fed tooltip text; manually block any special foods it misses.
+Food and partial Forever reference: Wowhead Forever. Beast/family data: [Petopia Forever](https://www.wow-petopia.com/forever/) and xWillawisp's linked community taming sheet. Classic ability/diet baseline: [Petopia Classic](https://www.wow-petopia.com/classic/abilities.php). See PET-DATA-SOURCES.md and WEAPON-COMPARISONS.md for scope, formula sources and limitations. Buff-food detection recognizes English Well Fed tooltip text; manually block any special foods it misses.
 
 Thanks to Raytchel Bates and Vanauge Imnewtorp for their suggestions!

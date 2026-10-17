@@ -69,7 +69,10 @@ function F.OpenFoodList()
     p.tabs={}
     function p:SelectTab(key)
         self.activeTab=key;self.catalogPage:SetShown(key=='catalog');self.feedingPage:SetShown(key=='feeding')
-        for name,tab in pairs(self.tabs) do tab:SetText((name==key and '|cffffd16a' or '')..tab.caption..(name==key and '|r' or ''));tab:SetEnabled(name~=key) end
+        for name,tab in pairs(self.tabs) do
+            tab:SetText((name==key and '|cffffd16a> ' or '')..tab.caption..(name==key and '|r' or ''))
+            tab:SetEnabled(true)
+        end
     end
     for i,spec in ipairs({{'catalog','Food catalog'},{'feeding','Feeding & alerts'}}) do
         local key=spec[1];local tab=CreateFrame('Button',nil,p,'UIPanelButtonTemplate')
@@ -204,6 +207,13 @@ function F.OpenFoodList()
     local questHelp=p.feedingPage:CreateFontString(nil,'OVERLAY','GameFontHighlightSmall')
     questHelp:SetPoint('TOPLEFT',310,-421)
     questHelp:SetText('All stacks, until turn-in or abandonment.')
+    local alertStatus=p.feedingPage:CreateFontString(nil,'OVERLAY','GameFontHighlightSmall')
+    alertStatus:SetPoint('TOPLEFT',25,-465);alertStatus:SetWidth(630);alertStatus:SetJustifyH('LEFT')
+    local elapsed=0
+    p.feedingPage:SetScript('OnUpdate',function(_,delta)
+        elapsed=elapsed+delta
+        if elapsed>=0.5 then elapsed=0;if F.HungerAlertStatus then alertStatus:SetText(F.HungerAlertStatus()) end end
+    end)
     checkParent=p.catalogList
     p.filters={}
     for _,spec in ipairs({{'In bags','inBags',22},{'Edible by current pet','edible',175},{'Blocked','blocked',415}}) do

@@ -119,6 +119,8 @@ loader:SetScript('OnEvent',function(_,event,a,b,c)
         SLASH_FEEDOMATICTOO4='/huntertools'
         SLASH_FEEDOMATICTOO2='/feedomatictoo'
         SlashCmdList.FEEDOMATICTOO=function(text)
+            if (text or ''):lower():match('^%s*hungerdebug%s*$') then F.DebugHungerAlerts();return end
+            if (text or ''):lower():match('^%s*beasts%s*$') then F.OpenBeastJournal();return end
             if (text or ''):lower():match('^%s*trainingdebug%s*$') then F.DebugPetTraining(); return end
             if (text or ''):lower():match('^%s*pet%s*$') then local s=F.PetStatusSettings();F.SetToolEnabled('pet',not s.enabled);return end
             if (text or ''):lower():match('^%s*weapons%s*$') then F.OpenWeaponComparisonSettings();return end

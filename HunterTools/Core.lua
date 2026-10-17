@@ -1,5 +1,5 @@
 local _, F = ...
-F.VERSION = "3.1.0"
+F.VERSION = "3.1.1"
 F.FEED_SPELL = 6991
 F.FEED_EFFECT = 1539
 
@@ -357,11 +357,16 @@ function F.FindFood()
                 end
             end
             if item and public(item.itemID) and item.itemID and item.stackCount > 0 and F.FoodAllowed(item.itemID) then
-                local name, link, quality, level = C_Item.GetItemInfo(item.itemID)
-                if not name then
-                    pending = true -- GetItemInfo requests uncached data; retry on its event.
-                elseif C_PetInfo.CanPetEatItem(item.itemID) then
-                    if item.isLocked then
+                -- Uncached weapons, quest items and other non-food must not hold
+                -- the entire food scan in a permanent loading state.
+                local edible=C_PetInfo.CanPetEatItem(item.itemID)
+                if not public(edible) or edible==nil then
+                    pending=true
+                elseif edible then
+                    local name, link, quality, level = C_Item.GetItemInfo(item.itemID)
+                    if not public(name) or not name then
+                        pending=true -- Only edible items require food metadata.
+                    elseif item.isLocked then
                         locked = true
                     else
                         count = count + item.stackCount
@@ -436,6 +441,10 @@ end
 -- One alert per hunger episode, with a minimum one-minute gap.
 function F.CheckHungerSound(state, reason)
     if InCombatLockdown() or not F.db.enabled then return end
+    local pet=UnitGUID and UnitGUID('pet')
+    if public(pet) and pet~=F.hungerSoundPet then
+        F.hungerSoundPet=pet;F.hungerAlerted=false;F.lastGrowl=nil
+    end
     if reason == "Pet is happy" or reason == "No pet" or reason == "Pet is dead" then
         F.hungerAlerted = false
     end
@@ -457,6 +466,10 @@ end
 
 function F.HungerMessage()
     local name = F.ReminderPetName()
+    if F.food then return name..' is hungry.' end
+    if F.pendingItems then return name..' is hungry. Food inventory is still loading.' end
+    if F.lockedFood then return name..' is hungry. Suitable food is temporarily locked.' end
+    if F.foodEntryPending then return name..' is hungry.' end
     if not F.food and not F.pendingItems and not F.lockedFood then
         return name .. " is hungry - no suitable, allowed food in your bags."
     end
@@ -482,7 +495,6 @@ end
 
 function F.CheckTextReminder(state, reason)
     if InCombatLockdown() or not F.db.enabled then return end
-    if F.foodEntryPending then return end
     if reason == "Pet is happy" or reason == "No pet" or reason == "Pet is dead" then
         F.lastTextReminder = nil
         F.reminderPet = nil
@@ -499,6 +511,26 @@ function F.CheckTextReminder(state, reason)
     if F.lastTextReminder and (interval == 0 or now - F.lastTextReminder < interval) then return end
     F.lastTextReminder = now
     F.ShowTextReminder()
+end
+
+function F.HungerAlertStatus()
+    if InCombatLockdown() then return 'Hunger alerts paused: combat.' end
+    if not F.db.enabled then return 'Hunger alerts paused: Pet feeding is disabled in the tools menu.' end
+    local state,reason=F.GetState()
+    local channel=F.db.textReminder or 'off'
+    if state~='hungry' then return 'Hunger alerts paused: '..tostring(reason)..'. Text reminders: '..channel..'.' end
+    if channel=='off' then return 'Pet is hungry. Text reminders are off; hunger sound '..(F.db.mute and 'is muted.' or 'is enabled.') end
+    local pet=UnitGUID and UnitGUID('pet')
+    local seconds=0
+    if public(pet) and pet==F.reminderPet and F.lastTextReminder then
+        if F.db.reminderMinutes==0 then return 'Pet is hungry. Reminder already sent; repeats are set to once per hunger episode.' end
+        seconds=math.max(0,math.ceil(F.db.reminderMinutes*60-(GetTime()-F.lastTextReminder)))
+    end
+    return 'Pet is hungry. Text reminders: '..channel..'. '..(seconds>0 and ('Next reminder in '..seconds..' seconds.') or 'Reminder is due.')
+end
+function F.DebugHungerAlerts()
+    F.Print(F.HungerAlertStatus())
+    F.Print('Inventory loading: '..tostring(F.foodEntryPending or F.pendingItems or false)..'; sound muted: '..tostring(F.db.mute)..'; sound already sent: '..tostring(F.hungerAlerted or false)..'.')
 end
 
 function F.WhyThisFood()

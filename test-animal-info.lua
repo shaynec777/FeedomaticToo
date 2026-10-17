@@ -74,7 +74,7 @@ assert(not detail:find('Bite',1,true) and not detail:find('Eats: Meat',1,true))
 assert(not F.foreverPetCreatureDB[250868].tameable,'do not infer tameability from a quest or comment')
 assert(F.foreverPetCreatureDB[251245].family=='Cat' and F.foreverPetCreatureDB[251245].tameable)
 UnitGUID=function() return 'Creature-0-123-1-2-251245-0000ABCD' end
-assert(F.TargetPetDetails():find('Cat',1,true) and F.TargetPetDetails():find('Wowhead: tameable',1,true))
+assert(F.TargetPetDetails():find('Cat',1,true) and F.TargetPetDetails():find('tameable: Wowhead Forever',1,true))
 UnitCreatureFamily=function() return 'Wolf' end
 assert(F.TargetPetDetails():find('Wolf',1,true),'live family must override static reference')
 C_TooltipInfo.GetUnit=function() return {lines={{leftText='Diet: Meat'},{leftText='Abilities: Bite Rank 2'}}} end

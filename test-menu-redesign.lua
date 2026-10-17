@@ -83,6 +83,7 @@ food.search:SetText('fish');food.search.scripts.OnTextChanged();assert(food.stat
 local selected;for _,row in ipairs(food.rows) do if row.id==1 then selected=row end end
 assert(selected);selected:SetChecked(true);selected.scripts.OnClick(selected);assert(lists.blacklist[1])
 food:SelectTab('feeding');F.OpenConfig();menu.actions.food.scripts.OnClick();assert(food.activeTab=='feeding','reopening retains the current tab')
+assert(food.tabs.feeding.enabled and food.tabs.feeding.text:find('> Feeding & alerts',1,true),'selected feeding tab must remain usable and visibly marked')
 F.ammoCatalog={[2512]={},[2515]={}}
 F.ScanAmmo=function() F.ammoCounts={[2512]=20};return true end
 F.AmmoInfo=function(id) return 'Ammo '..id end

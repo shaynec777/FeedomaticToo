@@ -16,7 +16,7 @@ local function panel(name,title,w,h)
     return p
 end
 function F.HideConfigPages()
-    for _,key in ipairs({'configPanel','foodPanel','ammoPanel','instanceSettingsPanel','rangeSettingsPanel','petStatusSettingsPanel','petListPanel','animalSettingsPanel','petAbilityBrowser','ammoUpgradePanel','protectionPanel','weaponSettingsPanel'}) do
+    for _,key in ipairs({'configPanel','foodPanel','ammoPanel','instanceSettingsPanel','rangeSettingsPanel','petStatusSettingsPanel','petListPanel','animalSettingsPanel','petAbilityBrowser','ammoUpgradePanel','protectionPanel','weaponSettingsPanel','beastJournalPanel'}) do
         if F[key] then F[key]:Hide() end
     end
 end
@@ -191,6 +191,7 @@ function F.OpenAnimalSettings()
                 end)
             end
         end
+        local journal=CreateFrame('Button',nil,p,'UIPanelButtonTemplate');journal:SetSize(240,26);journal:SetPoint('BOTTOM',0,66);journal:SetText('Beast journal / data collection');journal:SetScript('OnClick',function() F.OpenBeastJournal() end)
         local back=CreateFrame('Button',nil,p,'UIPanelButtonTemplate');back:SetSize(180,26);back:SetPoint('BOTTOM',0,28);back:SetText('Back to range settings');back:SetScript('OnClick',F.OpenRangeSettings)
     end
     local s=F.AnimalSettings();for surface,fields in pairs(F.animalSettingsPanel.fields) do for key,c in pairs(fields) do c:SetChecked(s[surface][key]) end end

@@ -37,6 +37,8 @@ local roles={Bat='Offensive',Bear='Defensive',Boar='Defensive',Cat='Offensive',
     Scorpid='Defensive',Spider='Offensive',Tallstrider='Defensive',Turtle='Defensive',
     ['Wind Serpent']='Offensive',Wolf='General (balanced)'}
 function F.PetRole(family)
+    local current=F.petopiaForeverFamilies and F.petopiaForeverFamilies[family]
+    if current and current.role then return current.role..' (Petopia Forever)' end
     return family and roles[family] and (roles[family]..' (Classic baseline)') or 'Unknown'
 end
 local foodCache={}
@@ -89,7 +91,8 @@ function F.AnimalDetails(unit,s)
     local npcID=type(guid)=='string' and guid:match('^Creature%-.*%-(%d+)%-%x+$')
     npcID=tonumber(npcID)
     local forever=npcID and F.foreverPetCreatureDB and F.foreverPetCreatureDB[npcID]
-    local record=forever or (npcID and F.petCreatureDB and F.petCreatureDB[npcID])
+    if F.ObserveBeast then F.ObserveBeast(unit) end
+    local record=F.BeastRecord and F.BeastRecord(npcID) or forever or (npcID and F.petCreatureDB and F.petCreatureDB[npcID])
     local hasFamily=type(family)=='string' and family~=''
     if not hasFamily and record and record.family then family=record.family;hasFamily=true end
     -- Missing family is normal for new Forever beasts. Still show available info.
@@ -105,8 +108,9 @@ function F.AnimalDetails(unit,s)
     if type(level)~='number' or level<1 then level=forever and forever.minLevel end
     if s.info then
         lines[#lines+1]=family..(type(level)=='number' and level>0 and (' - level '..level) or '')
-            ..(forever and forever.tameable==true and ' (Wowhead: tameable)' or ' (tameability unconfirmed)')
-        if forever and forever.zone then lines[#lines+1]='Location: '..forever.zone end
+            ..(record and record.tameable==true and ' (tameable: '..(record.sources and record.sources.tameable or 'Wowhead Forever')..')'
+                or record and record.tameable==false and ' (reference: not tameable)' or ' (tameability unconfirmed)')
+        if record and record.zone then lines[#lines+1]='Location: '..record.zone end
     end
     if s.role then lines[#lines+1]='Role: '..F.PetRole(family) end
     local diet,abilities
@@ -127,17 +131,29 @@ function F.AnimalDetails(unit,s)
         end
     end
     local baseline=false
-    if not abilities and record then abilities=record.abilities;baseline=(not forever) and s.abilities and abilities~=nil end
+    if not abilities and record then
+        abilities=record.abilities
+        if abilities and record.sources and s.abilities then lines[#lines+1]='Ability reference: '..record.sources.abilities..'.' end
+        baseline=(not record.sources and not forever) and s.abilities and abilities~=nil
+    end
     local wowheadDiet=false
+    local dietSource
+    if not diet and record and record.diet then diet=record.diet;dietSource=record.sources and record.sources.diet end
+    if not diet and F.BeastDiet then diet,dietSource=F.BeastDiet(family) end
     if not diet and forever then diet=forever.diet;wowheadDiet=diet~=nil end
     if not diet and F.foreverPetFamilyDiets then diet=F.foreverPetFamilyDiets[family];wowheadDiet=diet~=nil end
     if not diet and F.petFamilyDiets then diet=F.petFamilyDiets[family];baseline=baseline or ((s.diet or s.food) and diet~=nil) end
     if abilities and F.MarkTargetAbilities and s.abilities then abilities=F.MarkTargetAbilities(abilities) end
     if s.abilities then lines[#lines+1]='Abilities: '..(abilities or 'no database record; inspect with Beast Lore.') end
+    local familyInfo=F.petopiaForeverFamilies and F.petopiaForeverFamilies[family]
+    if s.abilities and not abilities and familyInfo and familyInfo.learnable and #familyInfo.learnable>0 then
+        lines[#lines+1]='Family training options: '..table.concat(familyInfo.learnable,', ')..' (Petopia Forever; innate ranks unknown).'
+    end
     if s.diet then lines[#lines+1]='Eats: '..(diet or 'not revealed; inspect with Beast Lore.') end
     if s.food then lines[#lines+1]='In bags: '..F.AnimalFoodCounts(diet,level) end
     if wowheadDiet and (s.diet or s.food) then lines[#lines+1]='Diet reference: Wowhead Forever.' end
-    if forever then lines[#lines+1]='Wowhead Forever record; unlisted pet details remain unknown.' end
+    if dietSource and (s.diet or s.food) then lines[#lines+1]='Diet reference: '..dietSource..'.' end
+    if record and record.sources and s.info then lines[#lines+1]='Beast reference: '..(record.sources.name or record.sources.family or 'Unknown')..'.' end
     if baseline then lines[#lines+1]='Classic baseline - Forever may differ.' end
     return #lines>0 and table.concat(lines,'\n') or nil
 end

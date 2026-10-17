@@ -56,7 +56,7 @@ F.db.petAbilityScanNames=nil
 F.OpenPetAbilityBrowser();local p=F.petAbilityBrowser;assert(p:IsShown() and scans==1)
 p.selectedKey='bite';p.selectedRank=nil;F.RefreshPetAbilityBrowser()
 assert(p.summary.text:find('unknown',1,true) and p.selectedRank==1)
-assert(p.animalRows[1].text:find('Level ',1,true) and p.sourceNote.text:find('Classic baseline',1,true))
+assert(p.animalRows[1].text:find('Level ',1,true) and p.sourceNote.text:find('Classic-linked',1,true))
 assert(p.animalNext.enabled,'Bite 1 should paginate many teachers')
 local first=p.animalRows[1].text;p.animalNext.scripts.OnClick();assert(p.animalPage==2 and p.animalRows[1].text~=first)
 p.rankButtons[2].scripts.OnClick();assert(p.selectedRank==2 and p.animalPage==1)
